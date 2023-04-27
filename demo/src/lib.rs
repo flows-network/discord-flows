@@ -16,7 +16,7 @@ async fn handle(msg: Message, token: String) {
         .send_message(
             channel_id.into(),
             &serde_json::json!({
-                "content": format!("You said: {content}"),
+                "content": content,
             }),
         )
         .await;
