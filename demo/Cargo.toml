@@ -1,0 +1,12 @@
+[package]
+name = "demo"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+discord-flows = { path = "../sdk" }
+tokio = { version = "1.28.0", features = ["rt", "macros"] }
