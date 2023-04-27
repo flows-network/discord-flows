@@ -1,5 +1,5 @@
 [package]
-name = "discord-integration"
+name = "discord-flows" # as shuttle.rs project name
 version = "0.1.0"
 edition = "2021"
 publish = false

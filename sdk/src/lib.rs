@@ -102,18 +102,9 @@ where
                 )
                 .unwrap();
 
-                match res.status_code().is_success() {
-                    true => {
-                        if let Ok(event) = serde_json::from_slice::<Message>(&writer) {
-                            callback(event).await;
-                        }
-                    }
-                    false => {
-                        write_error_log!(String::from_utf8_lossy(&writer));
-                        set_error_code(
-                            format!("{}", res.status_code()).parse::<i16>().unwrap_or(0),
-                        );
-                    }
+                if !res.status_code().is_success() {
+                    write_error_log!(String::from_utf8_lossy(&writer));
+                    set_error_code(format!("{}", res.status_code()).parse::<i16>().unwrap_or(0));
                 }
             }
             _ => {
