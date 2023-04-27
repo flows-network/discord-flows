@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+flowsnet-platform-sdk = "0.1.4"
 http_req_wasi = "0.10.2"
 percent-encoding = "2.2.0"
 serde = { version = "1.0.160", features = ["derive"] }
