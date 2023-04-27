@@ -9,4 +9,5 @@ crate-type = ["cdylib"]
 
 [dependencies]
 discord-flows = { path = "../sdk" }
+serde_json = "1.0.96"
 tokio = { version = "1.28.0", features = ["rt", "macros"] }
