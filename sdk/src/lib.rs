@@ -52,7 +52,7 @@ where
         let flow_id = _get_flow_id();
 
         let mut writer = Vec::new();
-        let res = request::get(
+        let res = request::post(
             format!(
                 "{}/{}/{}/revoke?bot_token={}",
                 API_PREFIX,
@@ -60,6 +60,7 @@ where
                 flow_id,
                 bot_token.as_ref(),
             ),
+            &[],
             &mut writer,
         )
         .unwrap();
@@ -88,7 +89,7 @@ where
                 let flow_id = _get_flow_id();
 
                 let mut writer = Vec::new();
-                let res = request::get(
+                let res = request::post(
                     format!(
                         "{}/{}/{}/listen?bot_token={}",
                         API_PREFIX,
@@ -96,6 +97,7 @@ where
                         flow_id,
                         bot_token.as_ref(),
                     ),
+                    &[],
                     &mut writer,
                 )
                 .unwrap();

@@ -6,8 +6,6 @@ pub async fn run() {
     let token = std::env::var("DISCORD_TOKEN").unwrap();
 
     listen_to_event(token.clone(), move |msg| handle(msg, token)).await;
-
-    println!("ok");
 }
 
 async fn handle(msg: Message, token: String) {
