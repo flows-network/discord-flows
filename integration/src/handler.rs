@@ -1,29 +1,25 @@
-use std::sync::Arc;
-
 use serenity::async_trait;
 use serenity::model::channel::Message;
 use serenity::prelude::{Context, EventHandler};
-use sqlx::PgPool;
+use upstash_redis_rs::{Command, ReResponse, Redis};
 
 use crate::common::{get_cache, get_client};
 
-#[derive(sqlx::FromRow)]
-struct Uuid {
-    uuid: String,
-}
-
 impl Handler {
     async fn _query_uuid(&self) -> Option<String> {
-        let sql = "
-            SELECT uuid FROM listener WHERE bot_token = $1
-        ";
-        let Uuid { uuid } = sqlx::query_as(sql)
-            .bind(self.token.clone())
-            .fetch_one(&*self.pool)
+        let uuid = self
+            .redis
+            .get(format!("discord:{}:handle", self.token))
+            .unwrap()
+            .send()
             .await
-            .ok()?;
+            .unwrap();
 
-        Some(uuid)
+        if let ReResponse::Success { result } = uuid {
+            result
+        } else {
+            None
+        }
     }
 
     async fn query_uuid(&self) -> Option<String> {
@@ -38,7 +34,7 @@ impl Handler {
 
 pub struct Handler {
     pub token: String,
-    pub pool: Arc<PgPool>,
+    pub redis: Redis,
 }
 
 #[async_trait]

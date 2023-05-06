@@ -1,33 +1,27 @@
-use std::sync::Arc;
-
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     routing::{get, post},
     Json, Router,
 };
-use common::{check_token, clients_map};
-use handler::Handler;
+use itertools::Itertools;
 use serde::Deserialize;
 use serde_json::Value;
-use serenity::{model::gateway::GatewayIntents, Client};
-use shuttle_runtime::CustomError;
-use sqlx::{Executor, PgPool};
+use serenity::model::gateway::GatewayIntents;
+use upstash_redis_rs::{Command, ReResponse, Redis};
 use uuid::Uuid;
+
+use common::{check_token, shard_map};
+use state::AppState;
 
 mod common;
 mod handler;
+mod state;
 
-#[derive(Deserialize, sqlx::FromRow)]
+#[derive(Deserialize)]
 struct Flow {
     flows_user: String,
     flow_id: String,
-}
-
-#[derive(sqlx::FromRow)]
-struct Bot {
-    #[sqlx(rename = "bot_token")]
-    token: String,
 }
 
 #[derive(Deserialize)]
@@ -49,19 +43,46 @@ async fn listen(
 
     let uuid = Uuid::new_v4().simple().to_string();
 
-    let sql = "
-        INSERT INTO listener(flow_id, flows_user, bot_token, uuid)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (flow_id, flows_user, bot_token) DO NOTHING
-    ";
-    sqlx::query(sql)
-        .bind(flow_id)
-        .bind(flows_user)
-        .bind(bot_token.clone())
-        .bind(uuid)
-        .execute(&*state.pool)
+    let res = state
+        .redis
+        .hset(
+            format!("discord:listen"),
+            format!("{flows_user}:{flow_id}"),
+            &bot_token,
+        )
+        .unwrap()
+        .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .unwrap();
+
+    if let ReResponse::Success { result } = res {
+        if result == 0 {
+            // already listening
+            return Ok(StatusCode::OK);
+        }
+    }
+
+    state
+        .redis
+        .sadd(format!("discord:{}:connected", flows_user), &bot_token)
+        .unwrap()
+        .send()
+        .await
+        .unwrap();
+    state
+        .redis
+        .set(format!("discord:{}:handle", bot_token), &uuid)
+        .unwrap()
+        .send()
+        .await
+        .unwrap();
+    state
+        .redis
+        .hset(format!("discord:{}:event", &uuid), flow_id, flows_user)
+        .unwrap()
+        .send()
+        .await
+        .unwrap();
 
     tokio::spawn(async move {
         _ = state.start_client(bot_token).await;
@@ -78,24 +99,28 @@ async fn revoke(
     State(state): State<AppState>,
     Query(ListenerQuery { bot_token }): Query<ListenerQuery>,
 ) -> Result<StatusCode, String> {
-    let sql = "
-        DELETE FROM listener
-        WHERE flow_id = $1 AND flows_user = $2 AND bot_token = $3
-    ";
-    sqlx::query(sql)
-        .bind(flow_id)
-        .bind(flows_user)
-        .bind(&bot_token)
-        .execute(&*state.pool)
+    state
+        .redis
+        .hdel("discord:listen", format!("{flows_user}:{flow_id}"))
+        .unwrap()
+        .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .unwrap();
+    // state
+    //     .redis
+    //     .hdel(format!("discord:{uuid}:event"), flow_id)
+    //     .unwrap()
+    //     .send()
+    //     .await
+    //     .unwrap();
 
-    let mut guard = clients_map().lock().await;
+    let mut guard = shard_map().lock().await;
     let v = guard.remove(&bot_token);
 
-    if let Some(client) = v {
-        client.shard_manager.lock().await.shutdown_all().await;
+    if let Some(shard_manager) = v {
+        shard_manager.lock().await.shutdown_all().await;
     }
+    drop(guard);
 
     Ok(StatusCode::OK)
 }
@@ -106,25 +131,24 @@ async fn event(
 ) -> Result<Json<Vec<Value>>, String> {
     let mut flows = Vec::new();
 
-    let sql = "
-        SELECT flows_user, flow_id FROM listener
-        WHERE uuid = $1
-    ";
-    let fs: Vec<Flow> = sqlx::query_as(sql)
-        .bind(uuid)
-        .fetch_all(&*state.pool)
+    let fs = state
+        .redis
+        .hgetall(format!("discord:{uuid}:event"))
+        .unwrap()
+        .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .unwrap();
 
-    for Flow {
-        flows_user,
-        flow_id,
-    } in fs
-    {
-        flows.push(serde_json::json!({
-            "flows_user": flows_user,
-            "flow_id": flow_id,
-        }));
+    if let ReResponse::Success { result } = fs {
+        for mut flow in &result.into_iter().chunks(2) {
+            let flow_id = flow.next().unwrap();
+            let flows_user = flow.next().unwrap();
+
+            flows.push(serde_json::json!({
+                "flows_user": flows_user,
+                "flow_id": flow_id,
+            }));
+        }
     }
 
     Ok(Json(flows))
@@ -136,17 +160,22 @@ async fn connected(
 ) -> Result<Json<Value>, String> {
     let mut results = Vec::new();
 
-    let sql = "SELECT bot_token FROM listener WHERE flows_user = $1";
-    let Bot { mut token } = sqlx::query_as(sql)
-        .bind(flows_user)
-        .fetch_one(&*state.pool)
+    let token = state
+        .redis
+        .smembers(format!("discord:{flows_user}:connected"))
+        .unwrap()
+        .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .unwrap();
 
-    let display = token.drain(..7).collect::<String>() + "...";
-    results.push(serde_json::json!({
-        "name": display,
-    }));
+    if let ReResponse::Success { result } = token {
+        for token in result {
+            let display = token.clone().drain(..7).collect::<String>() + "...";
+            results.push(serde_json::json!({
+                "name": display,
+            }));
+        }
+    }
 
     Ok(Json(serde_json::json!({
         "title": "Connected Bots",
@@ -154,64 +183,31 @@ async fn connected(
     })))
 }
 
-#[derive(Clone)]
-struct AppState {
-    pool: Arc<PgPool>,
-}
+#[tokio::main]
+async fn main() {
+    #[cfg(debug)]
+    env_logger::init();
 
-impl AppState {
-    async fn start_client(&self, token: String) -> serenity::Result<()> {
-        let intents = GatewayIntents::all();
-        let mut client = Client::builder(token.clone(), intents)
-            .event_handler(Handler {
-                token: token.clone(),
-                pool: self.pool.clone(),
-            })
-            .await
-            .unwrap();
+    let url = env!("UPSTASH_REDIS_REST_URL");
+    let token = env!("UPSTASH_REDIS_REST_TOKEN");
+    let redis = Redis::new(url, token).unwrap();
 
-        client.start().await?;
-
-        let mut guard = clients_map().lock().await;
-        guard.insert(token, client);
-
-        Ok(())
-    }
-
-    async fn listen_ws(&self) {
-        let sql = "SELECT bot_token FROM listener";
-        let bots: Vec<Bot> = sqlx::query_as(sql)
-            .fetch_all(&*self.pool)
-            .await
-            .map_err(|e| e.to_string())
-            .unwrap();
-        for Bot { token } in bots {
-            _ = self.start_client(token).await;
-        }
-    }
-}
-
-#[shuttle_runtime::main]
-async fn axum(#[shuttle_shared_db::Postgres] pool: PgPool) -> shuttle_axum::ShuttleAxum {
-    let pool = Arc::new(pool);
-
-    pool.execute(include_str!("../schema.sql"))
-        .await
-        .map_err(CustomError::new)?;
-
-    let state = AppState { pool };
+    let state = AppState { redis };
 
     let state_cloned = state.clone();
     tokio::spawn(async move {
         state_cloned.listen_ws().await;
     });
 
-    let router = Router::new()
+    let app = Router::new()
         .route("/:flows_user/:flow_id/listen", post(listen))
         .route("/:flows_user/:flow_id/revoke", post(revoke))
         .route("/event/:uuid", get(event))
         .route("/connected/:flows_user", get(connected))
         .with_state(state);
 
-    Ok(router.into())
+    axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 }
