@@ -185,7 +185,7 @@ async fn connected(
 
 #[tokio::main]
 async fn main() {
-    #[cfg(debug)]
+    #[cfg(feature = "debug")]
     env_logger::init();
 
     let url = env!("UPSTASH_REDIS_REST_URL");
