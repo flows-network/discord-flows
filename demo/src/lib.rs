@@ -12,6 +12,11 @@ async fn handle(msg: Message, token: String) {
     let client = get_client(token);
     let channel_id = msg.channel_id;
     let content = msg.content;
+
+    if msg.author.bot {
+        return;
+    }
+
     _ = client
         .send_message(
             channel_id.into(),
