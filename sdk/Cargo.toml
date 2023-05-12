@@ -5,6 +5,7 @@ edition = "2021"
 license = "MIT/Apache-2.0"
 description = "Discord extension for flows.network"
 documentation = "https://docs.rs/discord-flows"
+readme = "README.md"
 
 [package.metadata.docs.rs]
 default-target = "wasm32-wasi"
