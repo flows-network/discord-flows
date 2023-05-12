@@ -24,7 +24,7 @@ impl AppState {
         guard.insert(token, shard_manager);
         drop(guard);
 
-        client.start().await?;
+        tokio::spawn(async move { client.start().await });
 
         Ok(())
     }

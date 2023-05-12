@@ -15,8 +15,9 @@ impl Handler {
             .await
             .unwrap();
 
-        if let ReResponse::Success { result } = uuid {
-            result
+        if let ReResponse::Success { result: Some(uuid) } = uuid {
+            let mut cache = get_cache().lock().await;
+            cache.put(self.token.clone(), uuid)
         } else {
             None
         }
