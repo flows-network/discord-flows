@@ -1,4 +1,5 @@
 use crate::{common::shard_map, handler::Handler, GatewayIntents};
+use itertools::Itertools;
 use serenity::Client;
 use upstash_redis_rs::{Command, ReResponse, Redis};
 
@@ -39,7 +40,7 @@ impl AppState {
             .unwrap();
 
         if let ReResponse::Success { result } = tokens {
-            for token in result.iter().skip(1).step_by(2) {
+            for token in result.iter().skip(1).step_by(2).unique() {
                 _ = self.start_client(token.to_string()).await;
             }
         }
