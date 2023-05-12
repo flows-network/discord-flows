@@ -3,10 +3,10 @@ use serenity::model::channel::Message;
 use serenity::prelude::{Context, EventHandler};
 use upstash_redis_rs::{Command, ReResponse, Redis};
 
-use crate::common::{get_cache, get_client};
+use crate::common::{get_cache, get_client, Cache};
 
 impl Handler {
-    async fn _query_uuid(&self) -> Option<String> {
+    async fn _query_uuid(&self, cache: &mut Cache) -> Option<String> {
         let uuid = self
             .redis
             .get(format!("discord:{}:handle", self.token))
@@ -16,7 +16,6 @@ impl Handler {
             .unwrap();
 
         if let ReResponse::Success { result: Some(uuid) } = uuid {
-            let mut cache = get_cache().lock().await;
             cache.put(self.token.clone(), uuid)
         } else {
             None
@@ -28,7 +27,7 @@ impl Handler {
         let v = cache.get(&self.token);
         match v {
             Some(s) => Some(s.to_string()),
-            None => self._query_uuid().await,
+            None => self._query_uuid(&mut *cache).await,
         }
     }
 }

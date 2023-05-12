@@ -15,8 +15,10 @@ pub fn get_client() -> &'static Client {
     INS.get_or_init(Client::new)
 }
 
-pub fn get_cache() -> &'static Mutex<LruCache<String, String>> {
-    static INS: OnceCell<Mutex<LruCache<String, String>>> = OnceCell::new();
+pub type Cache = LruCache<String, String>;
+
+pub fn get_cache() -> &'static Mutex<Cache> {
+    static INS: OnceCell<Mutex<Cache>> = OnceCell::new();
     INS.get_or_init(|| {
         let cache = LruCache::new(NonZeroUsize::new(30).unwrap());
         Mutex::new(cache)
