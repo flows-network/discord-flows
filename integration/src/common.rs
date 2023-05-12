@@ -15,7 +15,7 @@ pub fn get_client() -> &'static Client {
     INS.get_or_init(Client::new)
 }
 
-pub type Cache = LruCache<String, String>;
+pub type Cache = LruCache<String, Vec<String>>;
 
 pub fn get_cache() -> &'static Mutex<Cache> {
     static INS: OnceCell<Mutex<Cache>> = OnceCell::new();

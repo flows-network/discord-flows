@@ -71,7 +71,7 @@ async fn listen(
         .unwrap();
     state
         .redis
-        .set(format!("discord:{}:handle", bot_token), &uuid)
+        .sadd(format!("discord:{}:handle", bot_token), &uuid)
         .unwrap()
         .send()
         .await
@@ -101,23 +101,21 @@ async fn revoke(
 ) -> Result<StatusCode, String> {
     let uuid = state
         .redis
-        .getdel(format!("discord:{}:handle", bot_token))
+        .smembers(format!("discord:{}:handle", bot_token))
         .unwrap()
         .send()
         .await
         .unwrap();
     match uuid {
         ReResponse::Success { result } => {
-            if let Some(uuid) = result {
+            for uuid in result {
                 state
                     .redis
-                    .del(format!("discord:{uuid}:event"))
+                    .hdel(format!("discord:{uuid}:event"), &flow_id)
                     .unwrap()
                     .send()
                     .await
                     .unwrap();
-            } else {
-                return Err("no uuid".to_string());
             }
         }
         ReResponse::Error { error } => return Err(error),
