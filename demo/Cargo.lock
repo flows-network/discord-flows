@@ -61,7 +61,9 @@ dependencies = [
 
 [[package]]
 name = "discord-flows"
-version = "0.1.0"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "609c2c8608cabfe3c2b3af43795c8796bfb3e565596ed6a4ce9cfeb468fe55bd"
 dependencies = [
  "flowsnet-platform-sdk",
  "http_req_wasi",
