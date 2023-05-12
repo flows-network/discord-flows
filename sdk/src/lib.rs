@@ -43,6 +43,12 @@ unsafe fn _get_flow_id() -> String {
     String::from_utf8(flow_id).unwrap()
 }
 
+/// Revoke previous registered listener of current flow.
+///
+/// Most of the time you do not need to call this function. As inside
+/// the [listen_to_event()] it will revoke previous registered
+/// listener, so the only circumstance you need this function is when
+/// you want to change the listener from Discord to others.
 pub fn revoke_listeners<S>(bot_token: S)
 where
     S: AsRef<str>,
@@ -75,6 +81,12 @@ where
     }
 }
 
+/// Create a listener for Discord bot represented by `bot_token`
+///
+/// Before creating the listener, this function will revoke previous
+/// registered listener of current flow so you don't need to do it manually.
+///
+/// `callback` is a callback function which will be called when new `Message` is received.
 pub async fn listen_to_event<S, F, Fut>(bot_token: S, callback: F)
 where
     S: AsRef<str>,
@@ -116,6 +128,7 @@ where
     }
 }
 
+/// Get a Discord Client as a bot represented by `bot_token`
 #[inline]
 pub fn get_client<S>(bot_token: S) -> Http
 where
