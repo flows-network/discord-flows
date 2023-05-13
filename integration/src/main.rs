@@ -220,7 +220,7 @@ async fn main() {
         .route("/connected/:flows_user", get(connected))
         .with_state(state);
 
-    axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
+    axum::Server::bind(&"0.0.0.0:6780".parse().unwrap())
         .serve(app.into_make_service())
         .await
         .unwrap();

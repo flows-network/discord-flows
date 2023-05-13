@@ -9,7 +9,7 @@ use http::{Http, HttpBuilder};
 use http_req::request;
 use model::Message;
 
-const API_PREFIX: &str = "http://github.purejs.icu";
+const API_PREFIX: &str = "https://discord.flows.network";
 
 extern "C" {
     // Flag if current running is for listening(1) or message receving(0)
