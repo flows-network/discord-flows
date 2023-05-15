@@ -10,6 +10,12 @@ pub struct AppState {
 
 impl AppState {
     pub async fn start_client(&self, token: String) -> serenity::Result<()> {
+        let mut guard = shard_map().lock().await;
+        let shard = guard.get(&token);
+        if shard.is_some() {
+            return Ok(());
+        }
+
         let intents = GatewayIntents::all();
         let mut client = Client::builder(token.clone(), intents)
             .event_handler(Handler {
@@ -21,7 +27,6 @@ impl AppState {
 
         let shard_manager = client.shard_manager.clone();
 
-        let mut guard = shard_map().lock().await;
         guard.insert(token, shard_manager);
         drop(guard);
 
