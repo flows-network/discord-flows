@@ -4,6 +4,7 @@ use reqwest::Client;
 use serenity::client::bridge::gateway::ShardManager;
 use std::{collections::HashMap, num::NonZeroUsize, sync::Arc};
 use tokio::sync::Mutex;
+use upstash_redis_rs::{Command, ReResponse, Redis};
 
 pub fn shard_map() -> &'static Mutex<HashMap<String, Arc<Mutex<ShardManager>>>> {
     static INSTANCE: OnceCell<Mutex<HashMap<String, Arc<Mutex<ShardManager>>>>> = OnceCell::new();
@@ -43,4 +44,39 @@ pub async fn check_token(token: &str) -> bool {
     }
 
     false
+}
+
+pub async fn batch_del(
+    redis: &Redis,
+    token: &str,
+    flow_id: &str,
+    flows_user: &str,
+) -> Result<(), String> {
+    let uuid = redis
+        .smembers(format!("discord:{}:handle", token))
+        .unwrap()
+        .send()
+        .await
+        .unwrap();
+    match uuid {
+        ReResponse::Success { result } => {
+            for uuid in result {
+                redis
+                    .hdel(format!("discord:{uuid}:event"), flow_id)
+                    .unwrap()
+                    .send()
+                    .await
+                    .unwrap();
+            }
+        }
+        ReResponse::Error { error } => return Err(error),
+    }
+    redis
+        .hdel("discord:listen", format!("{flows_user}:{flow_id}"))
+        .unwrap()
+        .send()
+        .await
+        .unwrap();
+
+    Ok(())
 }

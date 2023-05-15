@@ -15,7 +15,7 @@ use serenity::model::gateway::GatewayIntents;
 use upstash_redis_rs::{Command, ReResponse, Redis};
 use uuid::Uuid;
 
-use common::{check_token, shard_map};
+use common::{batch_del, check_token, shard_map};
 use state::AppState;
 
 static STATIC_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/static");
@@ -84,14 +84,18 @@ async fn listen(
         .unwrap();
     state
         .redis
-        .hset(format!("discord:{}:event", &uuid), flow_id, flows_user)
+        .hset(format!("discord:{}:event", &uuid), &flow_id, &flows_user)
         .unwrap()
         .send()
         .await
         .unwrap();
 
     tokio::spawn(async move {
-        _ = state.start_client(bot_token).await;
+        let ret = state.start_client(&bot_token).await;
+        let start = ret.unwrap_or(false);
+        if !start {
+            _ = batch_del(&state.redis, &bot_token, &flow_id, &flows_user).await;
+        }
     });
 
     Ok(StatusCode::OK)
@@ -105,34 +109,7 @@ async fn revoke(
     State(state): State<AppState>,
     Query(ListenerQuery { bot_token }): Query<ListenerQuery>,
 ) -> Result<StatusCode, String> {
-    let uuid = state
-        .redis
-        .smembers(format!("discord:{}:handle", bot_token))
-        .unwrap()
-        .send()
-        .await
-        .unwrap();
-    match uuid {
-        ReResponse::Success { result } => {
-            for uuid in result {
-                state
-                    .redis
-                    .hdel(format!("discord:{uuid}:event"), &flow_id)
-                    .unwrap()
-                    .send()
-                    .await
-                    .unwrap();
-            }
-        }
-        ReResponse::Error { error } => return Err(error),
-    }
-    state
-        .redis
-        .hdel("discord:listen", format!("{flows_user}:{flow_id}"))
-        .unwrap()
-        .send()
-        .await
-        .unwrap();
+    batch_del(&state.redis, &bot_token, &flow_id, &flows_user).await?;
 
     let mut guard = shard_map().lock().await;
     let v = guard.remove(&bot_token);

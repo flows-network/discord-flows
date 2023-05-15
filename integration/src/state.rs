@@ -9,17 +9,17 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub async fn start_client(&self, token: String) -> serenity::Result<()> {
+    pub async fn start_client(&self, token: &str) -> serenity::Result<bool> {
         let mut guard = shard_map().lock().await;
-        let shard = guard.get(&token);
+        let shard = guard.get(token);
         if shard.is_some() {
-            return Ok(());
+            return Ok(true);
         }
 
         let intents = GatewayIntents::all();
         let mut client = Client::builder(token.clone(), intents)
             .event_handler(Handler {
-                token: token.clone(),
+                token: token.to_string(),
                 redis: self.redis.clone(),
             })
             .await
@@ -27,12 +27,19 @@ impl AppState {
 
         let shard_manager = client.shard_manager.clone();
 
-        guard.insert(token, shard_manager);
+        let handle = tokio::spawn(async move { client.start().await.is_ok() });
+        let start = handle.await.unwrap_or(false);
+
+        println!("\n\n\nok");
+
+        if !start {
+            return Ok(false);
+        }
+
+        guard.insert(token.to_string(), shard_manager);
         drop(guard);
 
-        tokio::spawn(async move { client.start().await });
-
-        Ok(())
+        Ok(true)
     }
 
     pub async fn listen_ws(&self) {
@@ -46,7 +53,7 @@ impl AppState {
 
         if let ReResponse::Success { result } = tokens {
             for token in result.iter().skip(1).step_by(2).unique() {
-                _ = self.start_client(token.to_string()).await;
+                _ = self.start_client(token).await;
             }
         }
     }

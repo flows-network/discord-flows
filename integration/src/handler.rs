@@ -27,7 +27,7 @@ impl Handler {
         let v = cache.get(&self.token);
         match v {
             Some(s) => Some(s.to_vec()),
-            None => self._query_uuid(&mut *cache).await,
+            None => self._query_uuid(&mut cache).await,
         }
     }
 }
