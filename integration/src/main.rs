@@ -1,10 +1,14 @@
 use axum::{
+    body::{self, Empty, Full},
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{HeaderValue, Response, StatusCode},
+    response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
+use include_dir::{include_dir, Dir};
 use itertools::Itertools;
+use reqwest::header;
 use serde::Deserialize;
 use serde_json::Value;
 use serenity::model::gateway::GatewayIntents;
@@ -13,6 +17,8 @@ use uuid::Uuid;
 
 use common::{check_token, shard_map};
 use state::AppState;
+
+static STATIC_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/static");
 
 mod common;
 mod handler;
@@ -197,6 +203,26 @@ async fn connected(
     })))
 }
 
+async fn static_path(Path(path): Path<String>) -> impl IntoResponse {
+    let path = path.trim_start_matches('/');
+    let mime_type = mime_guess::from_path(path).first_or_text_plain();
+
+    match STATIC_DIR.get_file(path) {
+        None => Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(body::boxed(Empty::new()))
+            .unwrap(),
+        Some(file) => Response::builder()
+            .status(StatusCode::OK)
+            .header(
+                header::CONTENT_TYPE,
+                HeaderValue::from_str(mime_type.as_ref()).unwrap(),
+            )
+            .body(body::boxed(Full::from(file.contents())))
+            .unwrap(),
+    }
+}
+
 #[tokio::main]
 async fn main() {
     #[cfg(feature = "debug")]
@@ -218,9 +244,10 @@ async fn main() {
         .route("/:flows_user/:flow_id/revoke", post(revoke))
         .route("/event/:uuid", get(event))
         .route("/connected/:flows_user", get(connected))
+        .route("/static/*path", get(static_path))
         .with_state(state);
 
-    axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
+    axum::Server::bind(&"0.0.0.0:6780".parse().unwrap())
         .serve(app.into_make_service())
         .await
         .unwrap();

@@ -1,7 +1,7 @@
 use discord_flows::model::Message;
 use http_req::request;
 
-const API_PREFIX: &str = "https://discord-flows.shuttleapp.rs";
+const API_PREFIX: &str = "https://discord.flows.network";
 
 extern "C" {
     fn get_event_body_length() -> i32;
