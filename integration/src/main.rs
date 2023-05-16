@@ -91,11 +91,14 @@ async fn listen(
         .unwrap();
 
     tokio::spawn(async move {
-        let ret = state.start_client(&bot_token).await;
-        let start = ret.unwrap_or(false);
-        if !start {
-            _ = batch_del(&state.redis, &bot_token, &flow_id, &flows_user).await;
-        }
+        let cloned = state.redis.clone();
+        _ = state
+            .start_client(&bot_token.clone(), |start| async move {
+                if !start {
+                    _ = batch_del(&cloned, &bot_token, &flow_id, &flows_user).await;
+                }
+            })
+            .await;
     });
 
     Ok(StatusCode::OK)

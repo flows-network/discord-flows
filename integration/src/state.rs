@@ -1,3 +1,5 @@
+use std::future::Future;
+
 use crate::{common::shard_map, handler::Handler, GatewayIntents};
 use itertools::Itertools;
 use serenity::Client;
@@ -9,11 +11,15 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub async fn start_client(&self, token: &str) -> serenity::Result<bool> {
+    pub async fn start_client<F, Fut>(&self, token: &str, cb: F) -> serenity::Result<()>
+    where
+        F: FnOnce(bool) -> Fut + std::marker::Send + 'static,
+        Fut: Future<Output = ()> + std::marker::Send,
+    {
         let mut guard = shard_map().lock().await;
         let shard = guard.get(token);
         if shard.is_some() {
-            return Ok(true);
+            return Ok(());
         }
 
         let intents = GatewayIntents::all();
@@ -27,19 +33,12 @@ impl AppState {
 
         let shard_manager = client.shard_manager.clone();
 
-        let handle = tokio::spawn(async move { client.start().await.is_ok() });
-        let start = handle.await.unwrap_or(false);
-
-        println!("\n\n\nok");
-
-        if !start {
-            return Ok(false);
-        }
+        tokio::spawn(async move { cb(client.start().await.is_ok()).await });
 
         guard.insert(token.to_string(), shard_manager);
         drop(guard);
 
-        Ok(true)
+        Ok(())
     }
 
     pub async fn listen_ws(&self) {
@@ -53,7 +52,7 @@ impl AppState {
 
         if let ReResponse::Success { result } = tokens {
             for token in result.iter().skip(1).step_by(2).unique() {
-                _ = self.start_client(token).await;
+                _ = self.start_client(token, |_| async {}).await;
             }
         }
     }
