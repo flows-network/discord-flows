@@ -1,39 +1,20 @@
-use std::sync::Arc;
-
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     routing::{get, post},
     Json, Router,
 };
-use common::{check_token, clients_map};
-use handler::Handler;
-use serde::Deserialize;
+use common::{check_token, clients_map, pool, Bot, Flow, ListenerQuery};
 use serde_json::Value;
-use serenity::{model::gateway::GatewayIntents, Client};
+use serenity::model::gateway::GatewayIntents;
 use shuttle_runtime::CustomError;
-use sqlx::{Executor, PgPool};
+use sqlx::Executor;
+use state::AppState;
 use uuid::Uuid;
 
 mod common;
 mod handler;
-
-#[derive(Deserialize, sqlx::FromRow)]
-struct Flow {
-    flows_user: String,
-    flow_id: String,
-}
-
-#[derive(sqlx::FromRow)]
-struct Bot {
-    #[sqlx(rename = "bot_token")]
-    token: String,
-}
-
-#[derive(Deserialize)]
-struct ListenerQuery {
-    bot_token: String,
-}
+mod state;
 
 async fn listen(
     Path(Flow {
@@ -154,50 +135,14 @@ async fn connected(
     })))
 }
 
-#[derive(Clone)]
-struct AppState {
-    pool: Arc<PgPool>,
-}
+#[tokio::main]
+async fn main() {
+    let pool = pool();
 
-impl AppState {
-    async fn start_client(&self, token: String) -> serenity::Result<()> {
-        let intents = GatewayIntents::all();
-        let mut client = Client::builder(token.clone(), intents)
-            .event_handler(Handler {
-                token: token.clone(),
-                pool: self.pool.clone(),
-            })
-            .await
-            .unwrap();
-
-        client.start().await?;
-
-        let mut guard = clients_map().lock().await;
-        guard.insert(token, client);
-
-        Ok(())
-    }
-
-    async fn listen_ws(&self) {
-        let sql = "SELECT bot_token FROM listener";
-        let bots: Vec<Bot> = sqlx::query_as(sql)
-            .fetch_all(&*self.pool)
-            .await
-            .map_err(|e| e.to_string())
-            .unwrap();
-        for Bot { token } in bots {
-            _ = self.start_client(token).await;
-        }
-    }
-}
-
-#[shuttle_runtime::main]
-async fn axum(#[shuttle_shared_db::Postgres] pool: PgPool) -> shuttle_axum::ShuttleAxum {
-    let pool = Arc::new(pool);
-
-    pool.execute(include_str!("../schema.sql"))
+    _ = pool
+        .execute(include_str!("../schema.sql"))
         .await
-        .map_err(CustomError::new)?;
+        .map_err(CustomError::new);
 
     let state = AppState { pool };
 
@@ -206,12 +151,15 @@ async fn axum(#[shuttle_shared_db::Postgres] pool: PgPool) -> shuttle_axum::Shut
         state_cloned.listen_ws().await;
     });
 
-    let router = Router::new()
+    let app = Router::new()
         .route("/:flows_user/:flow_id/listen", post(listen))
         .route("/:flows_user/:flow_id/revoke", post(revoke))
         .route("/event/:uuid", get(event))
         .route("/connected/:flows_user", get(connected))
         .with_state(state);
 
-    Ok(router.into())
+    axum::Server::bind(&"0.0.0.0:6870".parse().unwrap())
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 }

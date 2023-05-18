@@ -1,8 +1,14 @@
 use lru::LruCache;
 use once_cell::sync::OnceCell;
 use reqwest::Client;
-use std::{collections::HashMap, num::NonZeroUsize};
+use serde::Deserialize;
+use sqlx::PgPool;
+use std::{collections::HashMap, num::NonZeroUsize, sync::Arc};
 use tokio::sync::Mutex;
+
+pub fn pool() -> Arc<PgPool> {
+    todo!()
+}
 
 pub fn clients_map() -> &'static Mutex<HashMap<String, serenity::Client>> {
     static INSTANCE: OnceCell<Mutex<HashMap<String, serenity::Client>>> = OnceCell::new();
@@ -40,4 +46,21 @@ pub async fn check_token(token: &str) -> bool {
     }
 
     false
+}
+
+#[derive(Deserialize, sqlx::FromRow)]
+pub struct Flow {
+    pub flows_user: String,
+    pub flow_id: String,
+}
+
+#[derive(sqlx::FromRow)]
+pub struct Bot {
+    #[sqlx(rename = "bot_token")]
+    pub token: String,
+}
+
+#[derive(Deserialize)]
+pub struct ListenerQuery {
+    pub bot_token: String,
 }
