@@ -2,16 +2,12 @@ use lru::LruCache;
 use once_cell::sync::OnceCell;
 use reqwest::Client;
 use serde::Deserialize;
-use sqlx::PgPool;
+use serenity::client::bridge::gateway::ShardManager;
 use std::{collections::HashMap, num::NonZeroUsize, sync::Arc};
 use tokio::sync::Mutex;
 
-pub fn pool() -> Arc<PgPool> {
-    todo!()
-}
-
-pub fn clients_map() -> &'static Mutex<HashMap<String, serenity::Client>> {
-    static INSTANCE: OnceCell<Mutex<HashMap<String, serenity::Client>>> = OnceCell::new();
+pub fn shard_map() -> &'static Mutex<HashMap<String, Arc<Mutex<ShardManager>>>> {
+    static INSTANCE: OnceCell<Mutex<HashMap<String, Arc<Mutex<ShardManager>>>>> = OnceCell::new();
     INSTANCE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 

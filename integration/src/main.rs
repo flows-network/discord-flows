@@ -1,20 +1,27 @@
+use std::sync::Arc;
+
 use axum::{
+    body::{self, Empty, Full},
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{HeaderValue, StatusCode},
+    response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
-use common::{check_token, clients_map, pool, Bot, Flow, ListenerQuery};
+use common::{check_token, shard_map, Bot, Flow, ListenerQuery};
+use include_dir::{include_dir, Dir};
+use reqwest::header;
 use serde_json::Value;
 use serenity::model::gateway::GatewayIntents;
-use shuttle_runtime::CustomError;
-use sqlx::Executor;
+use sqlx::{Executor, PgPool};
 use state::AppState;
 use uuid::Uuid;
 
 mod common;
 mod handler;
 mod state;
+
+static STATIC_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/static");
 
 async fn listen(
     Path(Flow {
@@ -71,12 +78,13 @@ async fn revoke(
         .await
         .map_err(|e| e.to_string())?;
 
-    let mut guard = clients_map().lock().await;
+    let mut guard = shard_map().lock().await;
     let v = guard.remove(&bot_token);
 
-    if let Some(client) = v {
-        client.shard_manager.lock().await.shutdown_all().await;
+    if let Some(shard_manager) = v {
+        shard_manager.lock().await.shutdown_all().await;
     }
+    drop(guard);
 
     Ok(StatusCode::OK)
 }
@@ -124,6 +132,7 @@ async fn connected(
         .await
         .map_err(|e| e.to_string())?;
 
+    // TODO: replace token with bot name
     let display = token.drain(..7).collect::<String>() + "...";
     results.push(serde_json::json!({
         "name": display,
@@ -135,14 +144,34 @@ async fn connected(
     })))
 }
 
+async fn static_path(Path(path): Path<String>) -> impl IntoResponse {
+    let path = path.trim_start_matches('/');
+    let mime_type = mime_guess::from_path(path).first_or_text_plain();
+
+    match STATIC_DIR.get_file(path) {
+        None => Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(body::boxed(Empty::new()))
+            .unwrap(),
+        Some(file) => Response::builder()
+            .status(StatusCode::OK)
+            .header(
+                header::CONTENT_TYPE,
+                HeaderValue::from_str(mime_type.as_ref()).unwrap(),
+            )
+            .body(body::boxed(Full::from(file.contents())))
+            .unwrap(),
+    }
+}
+
 #[tokio::main]
 async fn main() {
-    let pool = pool();
+    env_logger::init();
 
-    _ = pool
-        .execute(include_str!("../schema.sql"))
-        .await
-        .map_err(CustomError::new);
+    let db_url = env!("DATABASE_URL");
+    let pool = Arc::new(PgPool::connect(db_url).await.unwrap());
+
+    _ = pool.execute(include_str!("../schema.sql")).await.unwrap();
 
     let state = AppState { pool };
 
@@ -156,6 +185,7 @@ async fn main() {
         .route("/:flows_user/:flow_id/revoke", post(revoke))
         .route("/event/:uuid", get(event))
         .route("/connected/:flows_user", get(connected))
+        .route("/static/*path", get(static_path))
         .with_state(state);
 
     axum::Server::bind(&"0.0.0.0:6870".parse().unwrap())
