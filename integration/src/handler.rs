@@ -44,8 +44,7 @@ pub struct Handler {
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, _ctx: Context, msg: Message) {
-        // let hook_url = "https://code.flows.network/hook/discord/message";
-        let hook_url = "https://webhook.site/0ca33037-bc29-4154-987e-fc94eb4b49e4";
+        let hook_url = "https://code.flows.network/hook/discord/message";
         let uuid = self.query_uuid().await;
 
         if let Some(uuid) = uuid {

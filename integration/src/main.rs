@@ -166,6 +166,7 @@ async fn static_path(Path(path): Path<String>) -> impl IntoResponse {
 
 #[tokio::main]
 async fn main() {
+    #[cfg(feature = "debug")]
     env_logger::init();
 
     let db_url = env!("DATABASE_URL");
