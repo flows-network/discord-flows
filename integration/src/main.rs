@@ -40,7 +40,8 @@ async fn listen(
     let sql = "
         INSERT INTO listener(flow_id, flows_user, bot_token, uuid)
         VALUES ($1, $2, $3, $4)
-        ON CONFLICT (flow_id, flows_user, bot_token) DO NOTHING
+        ON CONFLICT (flow_id, flows_user)
+        DO UPDATE SET bot_token = excluded.bot_token
     ";
     let result = sqlx::query(sql)
         .bind(&flow_id)

@@ -3,5 +3,5 @@ CREATE TABLE IF NOT EXISTS listener (
     flows_user text NOT NULL,
     bot_token text NOT NULL,
     uuid text NOT NULL,
-    PRIMARY KEY (flow_id, flows_user, bot_token)
+    PRIMARY KEY (flow_id, flows_user)
 );
