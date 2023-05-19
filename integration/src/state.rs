@@ -47,7 +47,7 @@ impl AppState {
     }
 
     pub async fn listen_ws(&self) {
-        let sql = "SELECT bot_token FROM listener";
+        let sql = "SELECT DISTINCT bot_token FROM listener";
         let bots: Vec<Bot> = sqlx::query_as(sql)
             .fetch_all(&*self.pool)
             .await
