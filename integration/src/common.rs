@@ -1,10 +1,9 @@
-use lru::LruCache;
 use once_cell::sync::OnceCell;
 use reqwest::{Client, StatusCode};
 use serde::Deserialize;
 use serenity::client::bridge::gateway::ShardManager;
 use sqlx::PgPool;
-use std::{collections::HashMap, num::NonZeroUsize, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 
 pub fn shard_map() -> &'static Mutex<HashMap<String, Arc<Mutex<ShardManager>>>> {
@@ -15,14 +14,6 @@ pub fn shard_map() -> &'static Mutex<HashMap<String, Arc<Mutex<ShardManager>>>> 
 pub fn get_client() -> &'static Client {
     static INS: OnceCell<Client> = OnceCell::new();
     INS.get_or_init(Client::new)
-}
-
-pub fn get_cache() -> &'static Mutex<LruCache<String, String>> {
-    static INS: OnceCell<Mutex<LruCache<String, String>>> = OnceCell::new();
-    INS.get_or_init(|| {
-        let cache = LruCache::new(NonZeroUsize::new(30).unwrap());
-        Mutex::new(cache)
-    })
 }
 
 pub async fn check_token(token: &str) -> bool {

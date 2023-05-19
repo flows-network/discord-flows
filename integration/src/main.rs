@@ -15,7 +15,6 @@ use serde_json::Value;
 use serenity::model::gateway::GatewayIntents;
 use sqlx::{Executor, PgPool};
 use state::AppState;
-use uuid::Uuid;
 
 mod common;
 mod handler;
@@ -35,11 +34,9 @@ async fn listen(
         return Err("Unauthorized token".to_string());
     }
 
-    let uuid = Uuid::new_v4().simple().to_string();
-
     let sql = "
-        INSERT INTO listener(flow_id, flows_user, bot_token, uuid)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO listener(flow_id, flows_user, bot_token)
+        VALUES ($1, $2, $3)
         ON CONFLICT (flow_id, flows_user)
         DO UPDATE SET bot_token = excluded.bot_token
     ";
@@ -47,7 +44,6 @@ async fn listen(
         .bind(&flow_id)
         .bind(&flows_user)
         .bind(bot_token.clone())
-        .bind(uuid)
         .execute(&*state.pool)
         .await
         .map_err(|e| e.to_string())?;
@@ -83,17 +79,17 @@ async fn revoke(
 }
 
 async fn event(
-    Path(uuid): Path<String>,
+    Path(token): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Value>>, String> {
     let mut flows = Vec::new();
 
     let sql = "
         SELECT flows_user, flow_id FROM listener
-        WHERE uuid = $1
+        WHERE bot_token = $1
     ";
     let fs: Vec<Flow> = sqlx::query_as(sql)
-        .bind(uuid)
+        .bind(token)
         .fetch_all(&*state.pool)
         .await
         .map_err(|e| e.to_string())?;
@@ -177,7 +173,7 @@ async fn main() {
     let app = Router::new()
         .route("/:flows_user/:flow_id/listen", post(listen))
         .route("/:flows_user/:flow_id/revoke", post(revoke))
-        .route("/event/:uuid", get(event))
+        .route("/event/:token", get(event))
         .route("/connected/:flows_user", get(connected))
         .route("/static/*path", get(static_path))
         .with_state(state);
