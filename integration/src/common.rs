@@ -51,11 +51,11 @@ pub async fn del_and_shutdown(
     bot_token: &str,
     pool: &PgPool,
 ) -> Result<StatusCode, String> {
-    let sql = "
+    let delete = "
         DELETE FROM listener
         WHERE flow_id = $1 AND flows_user = $2 AND bot_token = $3
     ";
-    sqlx::query(sql)
+    sqlx::query(delete)
         .bind(flow_id)
         .bind(flows_user)
         .bind(bot_token)
@@ -63,13 +63,23 @@ pub async fn del_and_shutdown(
         .await
         .map_err(|e| e.to_string())?;
 
-    let mut guard = shard_map().lock().await;
-    let v = guard.remove(bot_token);
+    let select = sqlx::query!(
+        "SELECT COUNT(bot_token) FROM listener WHERE bot_token = $1",
+        bot_token,
+    )
+    .fetch_one(&*pool)
+    .await
+    .map_err(|e| e.to_string())?;
 
-    if let Some(shard_manager) = v {
-        shard_manager.lock().await.shutdown_all().await;
+    if select.count.unwrap_or(0) == 0 {
+        let mut guard = shard_map().lock().await;
+        let v = guard.remove(bot_token);
+
+        if let Some(shard_manager) = v {
+            shard_manager.lock().await.shutdown_all().await;
+        }
+        drop(guard);
     }
-    drop(guard);
 
     Ok(StatusCode::OK)
 }
