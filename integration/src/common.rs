@@ -1,8 +1,9 @@
 use lru::LruCache;
 use once_cell::sync::OnceCell;
-use reqwest::Client;
+use reqwest::{Client, StatusCode};
 use serde::Deserialize;
 use serenity::client::bridge::gateway::ShardManager;
+use sqlx::PgPool;
 use std::{collections::HashMap, num::NonZeroUsize, sync::Arc};
 use tokio::sync::Mutex;
 
@@ -42,6 +43,35 @@ pub async fn check_token(token: &str) -> bool {
     }
 
     false
+}
+
+pub async fn del_and_shutdown(
+    flow_id: &str,
+    flows_user: &str,
+    bot_token: &str,
+    pool: &PgPool,
+) -> Result<StatusCode, String> {
+    let sql = "
+        DELETE FROM listener
+        WHERE flow_id = $1 AND flows_user = $2 AND bot_token = $3
+    ";
+    sqlx::query(sql)
+        .bind(flow_id)
+        .bind(flows_user)
+        .bind(bot_token)
+        .execute(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let mut guard = shard_map().lock().await;
+    let v = guard.remove(bot_token);
+
+    if let Some(shard_manager) = v {
+        shard_manager.lock().await.shutdown_all().await;
+    }
+    drop(guard);
+
+    Ok(StatusCode::OK)
 }
 
 #[derive(Deserialize, sqlx::FromRow)]

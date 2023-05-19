@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{future::Future, sync::Arc};
 
 use crate::{
     common::{shard_map, Bot},
@@ -14,7 +14,11 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub async fn start_client(&self, token: String) -> serenity::Result<()> {
+    pub async fn start_client<F, Fut>(&self, token: String, cb: F) -> serenity::Result<()>
+    where
+        F: FnOnce(bool) -> Fut + std::marker::Send + 'static,
+        Fut: Future<Output = ()> + std::marker::Send,
+    {
         let mut guard = shard_map().lock().await;
         let shard = guard.get(&token);
         if shard.is_some() {
@@ -35,7 +39,9 @@ impl AppState {
         guard.insert(token, shard_manager);
         drop(guard);
 
-        tokio::spawn(async move { client.start().await });
+        tokio::spawn(async move {
+            cb(client.start().await.is_ok()).await;
+        });
 
         Ok(())
     }
@@ -48,7 +54,7 @@ impl AppState {
             .map_err(|e| e.to_string())
             .unwrap();
         for Bot { token } in bots {
-            _ = self.start_client(token).await;
+            _ = self.start_client(token, |_| async {}).await;
         }
     }
 }

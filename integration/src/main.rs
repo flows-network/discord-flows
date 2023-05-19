@@ -8,7 +8,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use common::{check_token, shard_map, Bot, Flow, ListenerQuery};
+use common::{check_token, del_and_shutdown, Bot, Flow, ListenerQuery};
 use include_dir::{include_dir, Dir};
 use reqwest::header;
 use serde_json::Value;
@@ -43,8 +43,8 @@ async fn listen(
         ON CONFLICT (flow_id, flows_user, bot_token) DO NOTHING
     ";
     sqlx::query(sql)
-        .bind(flow_id)
-        .bind(flows_user)
+        .bind(&flow_id)
+        .bind(&flows_user)
         .bind(bot_token.clone())
         .bind(uuid)
         .execute(&*state.pool)
@@ -52,7 +52,14 @@ async fn listen(
         .map_err(|e| e.to_string())?;
 
     tokio::spawn(async move {
-        _ = state.start_client(bot_token).await;
+        let cloned = state.pool.clone();
+        _ = state
+            .start_client(bot_token.clone(), |start| async move {
+                if !start {
+                    _ = del_and_shutdown(&flow_id, &flows_user, &bot_token, &cloned).await;
+                }
+            })
+            .await;
     });
 
     Ok(StatusCode::OK)
@@ -66,27 +73,7 @@ async fn revoke(
     State(state): State<AppState>,
     Query(ListenerQuery { bot_token }): Query<ListenerQuery>,
 ) -> Result<StatusCode, String> {
-    let sql = "
-        DELETE FROM listener
-        WHERE flow_id = $1 AND flows_user = $2 AND bot_token = $3
-    ";
-    sqlx::query(sql)
-        .bind(flow_id)
-        .bind(flows_user)
-        .bind(&bot_token)
-        .execute(&*state.pool)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let mut guard = shard_map().lock().await;
-    let v = guard.remove(&bot_token);
-
-    if let Some(shard_manager) = v {
-        shard_manager.lock().await.shutdown_all().await;
-    }
-    drop(guard);
-
-    Ok(StatusCode::OK)
+    del_and_shutdown(&flow_id, &flows_user, &bot_token, &state.pool).await
 }
 
 async fn event(
