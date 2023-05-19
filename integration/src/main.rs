@@ -42,7 +42,7 @@ async fn listen(
         VALUES ($1, $2, $3, $4)
         ON CONFLICT (flow_id, flows_user, bot_token) DO NOTHING
     ";
-    sqlx::query(sql)
+    let result = sqlx::query(sql)
         .bind(&flow_id)
         .bind(&flows_user)
         .bind(bot_token.clone())
@@ -50,6 +50,11 @@ async fn listen(
         .execute(&*state.pool)
         .await
         .map_err(|e| e.to_string())?;
+
+    if result.rows_affected() == 0 {
+        // DO NOTHING
+        return Ok(StatusCode::OK);
+    }
 
     tokio::spawn(async move {
         let cloned = state.pool.clone();
