@@ -8,7 +8,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use common::{check_token, del_and_shutdown, Bot, Flow, ListenerQuery};
+use common::{check_token, del_and_shutdown, is_token_dangling, Bot, Flow, ListenerQuery};
 use include_dir::{include_dir, Dir};
 use reqwest::header;
 use serde_json::Value;
@@ -51,6 +51,10 @@ async fn listen(
     if result.rows_affected() == 0 {
         // DO NOTHING
         return Ok(StatusCode::OK);
+    }
+
+    if is_token_dangling(&bot_token, &state.pool).await? {
+        _ = del_and_shutdown(&flow_id, &flows_user, &bot_token, &state.pool).await;
     }
 
     tokio::spawn(async move {

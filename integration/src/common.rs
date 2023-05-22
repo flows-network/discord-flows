@@ -54,15 +54,7 @@ pub async fn del_and_shutdown(
         .await
         .map_err(|e| e.to_string())?;
 
-    let select = sqlx::query!(
-        "SELECT COUNT(bot_token) FROM listener WHERE bot_token = $1",
-        bot_token,
-    )
-    .fetch_one(&*pool)
-    .await
-    .map_err(|e| e.to_string())?;
-
-    if select.count.unwrap_or(0) == 0 {
+    if is_token_dangling(bot_token, pool).await? {
         let mut guard = shard_map().lock().await;
         let v = guard.remove(bot_token);
 
@@ -73,6 +65,18 @@ pub async fn del_and_shutdown(
     }
 
     Ok(StatusCode::OK)
+}
+
+pub async fn is_token_dangling(bot_token: &str, pool: &PgPool) -> Result<bool, String> {
+    let select = sqlx::query!(
+        "SELECT COUNT(bot_token) FROM listener WHERE bot_token = $1",
+        bot_token,
+    )
+    .fetch_one(&*pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(select.count.unwrap_or(0) == 0)
 }
 
 #[derive(Deserialize, sqlx::FromRow)]
