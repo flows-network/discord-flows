@@ -1,10 +1,6 @@
 use std::{future::Future, sync::Arc};
 
-use crate::{
-    common::{shard_map, Bot},
-    handler::Handler,
-    GatewayIntents,
-};
+use crate::{handler::Handler, model::Bot, shared::shard_map, GatewayIntents};
 use serenity::Client;
 use sqlx::PgPool;
 

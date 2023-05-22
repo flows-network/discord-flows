@@ -5,7 +5,8 @@ use serenity::model::channel::Message;
 use serenity::prelude::{Context, EventHandler};
 use sqlx::PgPool;
 
-use crate::common::get_client;
+use crate::shared::get_client;
+use crate::HOOK_URL;
 
 pub struct Handler {
     pub token: String,
@@ -15,10 +16,9 @@ pub struct Handler {
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, _ctx: Context, msg: Message) {
-        let hook_url = "https://code.flows.network/hook/discord/message";
         let client = get_client();
         _ = client
-            .post(hook_url)
+            .post(HOOK_URL)
             .json(&msg)
             .header("X-Discord-token", &self.token)
             .send()
