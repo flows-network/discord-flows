@@ -17,7 +17,7 @@ pub unsafe fn message() {
         let headers = headers_from_subcription().unwrap_or_default();
         let uuid = headers
             .into_iter()
-            .find(|(_, v)| v.to_lowercase() == "x-discord-uuid")
+            .find(|(_, v)| v.to_lowercase() == "x-discord-token")
             .unwrap_or((String::new(), String::new()))
             .1;
 
