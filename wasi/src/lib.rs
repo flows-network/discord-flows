@@ -1,7 +1,7 @@
 use discord_flows::model::Message;
 use http_req::request;
 
-const API_PREFIX: &str = "https://discord-flows.shuttleapp.rs";
+const API_PREFIX: &str = "https://discord.flows.network";
 
 extern "C" {
     fn get_event_body_length() -> i32;
@@ -13,11 +13,14 @@ extern "C" {
 
 #[no_mangle]
 pub unsafe fn message() {
-    if let Some(_) = message_from_channel() {
+    if let Some(msg) = message_from_channel() {
+        // TODO: maybe pass bot_id from headers instead of uuid
+        if msg.author.bot || msg.author.name == "bot_name" {}
+
         let headers = headers_from_subcription().unwrap_or_default();
         let uuid = headers
             .into_iter()
-            .find(|(_, v)| v.to_lowercase() == "x-discord-token")
+            .find(|(k, _)| k.to_lowercase() == "x-discord-token")
             .unwrap_or((String::new(), String::new()))
             .1;
 

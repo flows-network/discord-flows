@@ -292,6 +292,7 @@ dependencies = [
  "axum",
  "env_logger",
  "include_dir",
+ "lazy_static",
  "mime_guess",
  "once_cell",
  "reqwest",

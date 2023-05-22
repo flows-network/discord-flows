@@ -5,5 +5,7 @@ default.nix
 .envrc
 
 **/target
-/demo
-sdk/Cargo.lock
+integration/Cargo.lock
+wasi/Cargo.lock
+integration/.cargo
+build.rs

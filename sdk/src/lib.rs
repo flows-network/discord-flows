@@ -1,3 +1,5 @@
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"))]
+
 use std::future::Future;
 
 pub mod http;
@@ -9,7 +11,11 @@ use http::{Http, HttpBuilder};
 use http_req::request;
 use model::Message;
 
-const API_PREFIX: &str = "https://discord-flows.shuttleapp.rs";
+lazy_static::lazy_static! {
+    static ref API_PREFIX: String = String::from(
+        std::option_env!("DISCORD_API_PREFIX").unwrap_or("https://discord.flows.network")
+    );
+}
 
 extern "C" {
     // Flag if current running is for listening(1) or message receving(0)
@@ -43,6 +49,12 @@ unsafe fn _get_flow_id() -> String {
     String::from_utf8(flow_id).unwrap()
 }
 
+/// Revoke previous registered listener of current flow.
+///
+/// Most of the time you do not need to call this function. As inside
+/// the [listen_to_event()] it will revoke previous registered
+/// listener, so the only circumstance you need this function is when
+/// you want to change the listener from Discord to others.
 pub fn revoke_listeners<S>(bot_token: S)
 where
     S: AsRef<str>,
@@ -52,14 +64,15 @@ where
         let flow_id = _get_flow_id();
 
         let mut writer = Vec::new();
-        let res = request::get(
+        let res = request::post(
             format!(
                 "{}/{}/{}/revoke?bot_token={}",
-                API_PREFIX,
+                API_PREFIX.as_str(),
                 flows_user,
                 flow_id,
                 bot_token.as_ref(),
             ),
+            &[],
             &mut writer,
         )
         .unwrap();
@@ -74,6 +87,12 @@ where
     }
 }
 
+/// Create a listener for Discord bot represented by `bot_token`
+///
+/// Before creating the listener, this function will revoke previous
+/// registered listener of current flow so you don't need to do it manually.
+///
+/// `callback` is a callback function which will be called when new `Message` is received.
 pub async fn listen_to_event<S, F, Fut>(bot_token: S, callback: F)
 where
     S: AsRef<str>,
@@ -88,30 +107,22 @@ where
                 let flow_id = _get_flow_id();
 
                 let mut writer = Vec::new();
-                let res = request::get(
+                let res = request::post(
                     format!(
                         "{}/{}/{}/listen?bot_token={}",
-                        API_PREFIX,
+                        API_PREFIX.as_str(),
                         flows_user,
                         flow_id,
                         bot_token.as_ref(),
                     ),
+                    &[],
                     &mut writer,
                 )
                 .unwrap();
 
-                match res.status_code().is_success() {
-                    true => {
-                        if let Ok(event) = serde_json::from_slice::<Message>(&writer) {
-                            callback(event).await;
-                        }
-                    }
-                    false => {
-                        write_error_log!(String::from_utf8_lossy(&writer));
-                        set_error_code(
-                            format!("{}", res.status_code()).parse::<i16>().unwrap_or(0),
-                        );
-                    }
+                if !res.status_code().is_success() {
+                    write_error_log!(String::from_utf8_lossy(&writer));
+                    set_error_code(format!("{}", res.status_code()).parse::<i16>().unwrap_or(0));
                 }
             }
             _ => {
@@ -123,6 +134,7 @@ where
     }
 }
 
+/// Get a Discord Client as a bot represented by `bot_token`
 #[inline]
 pub fn get_client<S>(bot_token: S) -> Http
 where

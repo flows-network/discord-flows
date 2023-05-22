@@ -18,7 +18,7 @@ impl EventHandler for Handler {
     async fn message(&self, _ctx: Context, msg: Message) {
         let client = get_client();
         _ = client
-            .post(HOOK_URL)
+            .post(HOOK_URL.as_str())
             .json(&msg)
             .header("X-Discord-token", &self.token)
             .send()

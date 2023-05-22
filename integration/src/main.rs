@@ -18,7 +18,11 @@ mod shared;
 mod state;
 mod utils;
 
-const HOOK_URL: &str = "https://code.flows.network/hook/discord/message";
+lazy_static::lazy_static! {
+    static ref HOOK_URL: String = String::from(
+        std::option_env!("PLATFORM_HOOK_URL").unwrap_or("https://code.flows.network/hook/discord/message")
+    );
+}
 static STATIC_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/static");
 
 #[tokio::main]
