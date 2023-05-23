@@ -28,16 +28,16 @@ pub mod database {
 
     use crate::{model::Count, shared::shard_map};
 
-    pub async fn del_raw_by_token(
+    pub async fn del_listener_by_token(
         flow_id: &str,
         flows_user: &str,
         bot_token: &str,
         pool: &PgPool,
     ) -> Result<StatusCode, String> {
         let delete = "
-        DELETE FROM listener
-        WHERE flow_id = $1 AND flows_user = $2 AND bot_token = $3
-    ";
+            DELETE FROM listener
+            WHERE flow_id = $1 AND flows_user = $2 AND bot_token = $3
+        ";
         sqlx::query(delete)
             .bind(flow_id)
             .bind(flows_user)

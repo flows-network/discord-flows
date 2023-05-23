@@ -1,6 +1,6 @@
 use std::{future::Future, sync::Arc};
 
-use crate::{handler::Handler, model::Bot, shared::shard_map, GatewayIntents};
+use crate::{handler::Handler, model::Bot, shared::shard_map, GatewayIntents, DEFAULT_TOKEN};
 use serenity::Client;
 use sqlx::PgPool;
 
@@ -43,12 +43,24 @@ impl AppState {
     }
 
     pub async fn listen_ws(&self) {
+        self.start_default_client().await;
+        self.start_user_client().await;
+    }
+
+    async fn start_default_client(&self) {
+        _ = self
+            .start_client(DEFAULT_TOKEN.to_string(), |_| async {})
+            .await;
+    }
+
+    async fn start_user_client(&self) {
         let sql = "SELECT DISTINCT bot_token FROM listener";
         let bots: Vec<Bot> = sqlx::query_as(sql)
             .fetch_all(&*self.pool)
             .await
             .map_err(|e| e.to_string())
             .unwrap();
+
         for Bot { token } in bots {
             _ = self.start_client(token, |_| async {}).await;
         }

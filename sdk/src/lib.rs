@@ -1,6 +1,6 @@
 #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"))]
 
-use std::future::Future;
+use std::{fmt::Display, future::Future};
 
 pub mod http;
 
@@ -87,15 +87,93 @@ where
     }
 }
 
+pub enum Bot {
+    Default,
+    Provided(String),
+}
+
+impl Bot {
+    pub fn new<S: Into<String>>(token: S) -> Self {
+        Self::Provided(token.into())
+    }
+}
+
+impl Display for Bot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Bot::Default => f.write_str("DEFAULT_BOT"),
+            Bot::Provided(token) => f.write_str(&token),
+        }
+    }
+}
+
+impl Default for Bot {
+    fn default() -> Self {
+        Bot::Default
+    }
+}
+
+impl From<String> for Bot {
+    fn from(value: String) -> Self {
+        Bot::new(value)
+    }
+}
+
+impl From<&str> for Bot {
+    fn from(value: &str) -> Self {
+        Bot::new(value)
+    }
+}
+
+impl From<Option<String>> for Bot {
+    fn from(value: Option<String>) -> Self {
+        match value {
+            Some(v) => Bot::new(v),
+            None => Bot::default(),
+        }
+    }
+}
+
+impl From<Option<&str>> for Bot {
+    fn from(value: Option<&str>) -> Self {
+        match value {
+            Some(v) => Bot::new(v),
+            None => Bot::default(),
+        }
+    }
+}
+
 /// Create a listener for Discord bot represented by `bot_token`
 ///
 /// Before creating the listener, this function will revoke previous
 /// registered listener of current flow so you don't need to do it manually.
 ///
 /// `callback` is a callback function which will be called when new `Message` is received.
-pub async fn listen_to_event<S, F, Fut>(bot_token: S, callback: F)
+///
+/// # Example
+///
+/// ## Provide token
+/// ```rust
+/// #[tokio::main]
+/// pub async run() {
+///     listen_to_event("YOUR BOT TOKEN", |msg| async {
+///         todo!()
+///     }).await;
+/// }
+/// ```
+///
+/// ## Use the token provided by flows.network
+/// ```rust
+/// #[tokio::main]
+/// pub async run() {
+///     listen_to_event(Bot::default(), |msg| async {
+///         todo!()
+///     }).await;
+/// }
+/// ```
+pub async fn listen_to_event<S, F, Fut>(bot: S, callback: F)
 where
-    S: AsRef<str>,
+    S: Into<Bot>,
     F: FnOnce(Message) -> Fut,
     Fut: Future<Output = ()>,
 {
@@ -113,7 +191,7 @@ where
                         API_PREFIX.as_str(),
                         flows_user,
                         flow_id,
-                        bot_token.as_ref(),
+                        bot.into(),
                     ),
                     &[],
                     &mut writer,

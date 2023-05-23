@@ -25,6 +25,8 @@ lazy_static::lazy_static! {
 }
 static STATIC_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/static");
 
+const DEFAULT_TOKEN: &str = "";
+
 #[tokio::main]
 async fn main() {
     let state = init().await;
