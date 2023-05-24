@@ -19,11 +19,6 @@ pub async fn listen(
     State(state): State<AppState>,
     Query(ListenerQuery { bot_token }): Query<ListenerQuery>,
 ) -> Result<StatusCode, String> {
-    if bot_token == "DEFAULT_BOT" {
-        insert_listener(&flow_id, &flows_user, &bot_token, &state.pool).await?;
-        return Ok(StatusCode::OK);
-    }
-
     if !check_token(&bot_token).await {
         return Err("Unauthorized token".to_string());
     }

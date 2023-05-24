@@ -26,7 +26,7 @@ pub mod database {
     use reqwest::StatusCode;
     use sqlx::PgPool;
 
-    use crate::{model::Count, shared::shard_map};
+    use crate::{model::Count, shared::shard_map, DEFAULT_BOT_PLACEHOLDER};
 
     pub async fn del_listener_by_token(
         flow_id: &str,
@@ -50,6 +50,10 @@ pub mod database {
     }
 
     pub async fn safe_shutdown(bot_token: &str, pool: &PgPool) {
+        // Don't shutdown the default Bot
+        if bot_token == DEFAULT_BOT_PLACEHOLDER {
+            return;
+        }
         if is_token_dangling(bot_token, pool).await.unwrap_or(false) {
             shutdown(bot_token).await;
         }

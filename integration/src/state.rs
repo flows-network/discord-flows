@@ -1,6 +1,9 @@
 use std::{future::Future, sync::Arc};
 
-use crate::{handler::Handler, model::Bot, shared::shard_map, GatewayIntents, DEFAULT_TOKEN};
+use crate::{
+    handler::Handler, model::Bot, shared::shard_map, GatewayIntents, DEFAULT_BOT_PLACEHOLDER,
+    DEFAULT_TOKEN,
+};
 use serenity::Client;
 use sqlx::PgPool;
 
@@ -22,7 +25,11 @@ impl AppState {
         }
 
         let intents = GatewayIntents::all();
-        let mut client = Client::builder(token.clone(), intents)
+        let real_token = match token == DEFAULT_BOT_PLACEHOLDER {
+            true => DEFAULT_TOKEN.as_str(),
+            false => token.as_str(),
+        };
+        let mut client = Client::builder(real_token, intents)
             .event_handler(Handler {
                 token: token.clone(),
                 pool: self.pool.clone(),
@@ -49,7 +56,7 @@ impl AppState {
 
     async fn start_default_client(&self) {
         _ = self
-            .start_client(DEFAULT_TOKEN.to_string(), |_| async {})
+            .start_client(DEFAULT_BOT_PLACEHOLDER.to_string(), |_| async {})
             .await;
     }
 
