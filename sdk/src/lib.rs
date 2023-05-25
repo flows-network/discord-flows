@@ -55,9 +55,9 @@ unsafe fn _get_flow_id() -> String {
 /// the [listen_to_event()] it will revoke previous registered
 /// listener, so the only circumstance you need this function is when
 /// you want to change the listener from Discord to others.
-pub fn revoke_listeners<S>(bot_token: S)
+pub fn revoke_listeners<S>(bot: S)
 where
-    S: AsRef<str>,
+    S: Into<Bot>,
 {
     unsafe {
         let flows_user = _get_flows_user();
@@ -70,7 +70,7 @@ where
                 API_PREFIX.as_str(),
                 flows_user,
                 flow_id,
-                bot_token.as_ref(),
+                bot.into(),
             ),
             &[],
             &mut writer,
@@ -218,6 +218,7 @@ pub fn get_client<S>(bot_token: S) -> Http
 where
     S: AsRef<str>,
 {
+
     HttpBuilder::new(bot_token).build()
 }
 
