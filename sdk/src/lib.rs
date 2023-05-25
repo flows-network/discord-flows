@@ -11,13 +11,6 @@ use http::{Http, HttpBuilder};
 use http_req::request;
 use model::Message;
 
-#[macro_export]
-macro_rules! API_PREFIX {
-    () => {
-        "https://discord.flows.network"
-    };
-}
-
 const API_PREFIX: &str = match std::option_env!("DISCORD_API_PREFIX") {
     Some(v) => v,
     None => "https://discord.flows.network",

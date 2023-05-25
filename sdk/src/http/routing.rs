@@ -684,12 +684,12 @@ impl Route {
     }
 
     #[must_use]
-    pub fn gateway() -> &'static str {
+    pub fn gateway() -> String {
         api!("/gateway")
     }
 
     #[must_use]
-    pub fn gateway_bot() -> &'static str {
+    pub fn gateway_bot() -> String {
         api!("/gateway/bot")
     }
 
@@ -981,7 +981,7 @@ impl Route {
     }
 
     #[must_use]
-    pub fn guilds() -> &'static str {
+    pub fn guilds() -> String {
         api!("/guilds")
     }
 
@@ -1009,12 +1009,12 @@ impl Route {
     }
 
     #[must_use]
-    pub fn oauth2_application_current() -> &'static str {
+    pub fn oauth2_application_current() -> String {
         api!("/oauth2/applications/@me")
     }
 
     #[must_use]
-    pub fn private_channel() -> &'static str {
+    pub fn private_channel() -> String {
         api!("/users/@me/channels")
     }
 
@@ -1039,7 +1039,7 @@ impl Route {
     }
 
     #[must_use]
-    pub fn sticker_packs() -> &'static str {
+    pub fn sticker_packs() -> String {
         api!("/sticker-packs")
     }
 
@@ -1049,7 +1049,7 @@ impl Route {
     }
 
     #[must_use]
-    pub fn user_me_connections() -> &'static str {
+    pub fn user_me_connections() -> String {
         api!("/users/@me/connections")
     }
 
@@ -1093,7 +1093,7 @@ impl Route {
     }
 
     #[must_use]
-    pub fn voice_regions() -> &'static str {
+    pub fn voice_regions() -> String {
         api!("/voice/regions")
     }
 
@@ -1215,7 +1215,7 @@ impl Route {
     }
 
     #[must_use]
-    pub fn stage_instances() -> &'static str {
+    pub fn stage_instances() -> String {
         api!("/stage-instances")
     }
 

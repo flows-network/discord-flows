@@ -94,18 +94,20 @@ pub(crate) fn from_number(n: impl ToNumber) -> Value {
 }
 
 macro_rules! api {
-    ($e:expr) => {
-        concat!(crate::API_PREFIX!(), "/proxy/api", $e)
-    };
-    ($e:expr, $($rest:tt)*) => {
-        format!(api!($e), $($rest)*)
+    ($($rest:tt)*) => {
+        {
+            let mut api = String::from(crate::API_PREFIX);
+            api.push_str("/proxy/api");
+            _ = write!(api, $($rest)*);
+            api
+        }
     };
 }
 pub(crate) use api;
 
 macro_rules! status {
     ($e:expr) => {
-        concat!(crate::API_PREFIX!(), "/proxy/status", $e)
+        const_format::concatcp!(crate::API_PREFIX, "/proxy/status", $e)
     };
 }
 pub(crate) use status;
