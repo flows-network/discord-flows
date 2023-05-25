@@ -95,7 +95,7 @@ pub(crate) fn from_number(n: impl ToNumber) -> Value {
 
 macro_rules! api {
     ($e:expr) => {
-        concat!("https://discord.com/api/v10", $e)
+        concat!(crate::API_PREFIX!(), "/proxy/api", $e)
     };
     ($e:expr, $($rest:tt)*) => {
         format!(api!($e), $($rest)*)
@@ -105,7 +105,7 @@ pub(crate) use api;
 
 macro_rules! status {
     ($e:expr) => {
-        concat!("https://status.discord.com/api/v2", $e)
+        concat!(crate::API_PREFIX!(), "/proxy/status", $e)
     };
 }
 pub(crate) use status;

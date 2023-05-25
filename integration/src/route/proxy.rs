@@ -6,13 +6,10 @@ use axum::{
 use reqwest::Request as RRequest;
 use serde::Deserialize;
 
-use crate::{model::Flow, shared::get_client, DEFAULT_TOKEN};
+use crate::{shared::get_client, DEFAULT_TOKEN};
 
 #[derive(Deserialize)]
 pub struct PF {
-    #[serde(flatten)]
-    pub flow: Flow,
-    pub token: String,
     pub api: DiscordApi,
     pub path: String,
 }
@@ -24,24 +21,15 @@ pub enum DiscordApi {
     Status,
 }
 
-pub async fn proxy(
-    Path(PF {
-        flow:
-            Flow {
-                // reserved
-                flows_user: _,
-                flow_id: _,
-            },
-        token,
-        api,
-        path,
-    }): Path<PF>,
-    mut req: Request<Body>,
-) -> Response<Body> {
+pub async fn proxy(Path(PF { api, path }): Path<PF>, mut req: Request<Body>) -> Response<Body> {
+    let hds = req.headers_mut();
+    let x_token = hds.remove("Authorization").unwrap();
+    let token = x_token.to_str().unwrap().strip_prefix("Bot ").unwrap();
+
     let token = if token == "DEFAULT_BOT" {
         &*DEFAULT_TOKEN
     } else {
-        &token
+        token
     };
 
     let (host, api_ver) = match api {
@@ -65,6 +53,8 @@ pub async fn proxy(
     hds.remove("Accept-Encoding");
 
     let new_req = RRequest::try_from(req).unwrap();
+
+    println!("{:#?}", new_req);
 
     let client = get_client();
     let resp = client.execute(new_req).await;

@@ -11,11 +11,17 @@ use http::{Http, HttpBuilder};
 use http_req::request;
 use model::Message;
 
-lazy_static::lazy_static! {
-    static ref API_PREFIX: String = String::from(
-        std::option_env!("DISCORD_API_PREFIX").unwrap_or("https://discord.flows.network")
-    );
+#[macro_export]
+macro_rules! API_PREFIX {
+    () => {
+        "https://discord.flows.network"
+    };
 }
+
+const API_PREFIX: &str = match std::option_env!("DISCORD_API_PREFIX") {
+    Some(v) => v,
+    None => "https://discord.flows.network",
+};
 
 extern "C" {
     // Flag if current running is for listening(1) or message receving(0)
@@ -32,14 +38,14 @@ extern "C" {
     fn set_error_code(code: i16);
 }
 
-unsafe fn _get_flows_user() -> String {
+pub(crate) unsafe fn _get_flows_user() -> String {
     let mut flows_user = Vec::<u8>::with_capacity(100);
     let c = get_flows_user(flows_user.as_mut_ptr());
     flows_user.set_len(c as usize);
     String::from_utf8(flows_user).unwrap()
 }
 
-unsafe fn _get_flow_id() -> String {
+pub(crate) unsafe fn _get_flow_id() -> String {
     let mut flow_id = Vec::<u8>::with_capacity(100);
     let c = get_flow_id(flow_id.as_mut_ptr());
     if c == 0 {
@@ -67,7 +73,7 @@ where
         let res = request::post(
             format!(
                 "{}/{}/{}/revoke?bot_token={}",
-                API_PREFIX.as_str(),
+                API_PREFIX,
                 flows_user,
                 flow_id,
                 bot.into(),
@@ -188,7 +194,7 @@ where
                 let res = request::post(
                     format!(
                         "{}/{}/{}/listen?bot_token={}",
-                        API_PREFIX.as_str(),
+                        API_PREFIX,
                         flows_user,
                         flow_id,
                         bot.into(),
@@ -218,7 +224,6 @@ pub fn get_client<S>(bot_token: S) -> Http
 where
     S: AsRef<str>,
 {
-
     HttpBuilder::new(bot_token).build()
 }
 

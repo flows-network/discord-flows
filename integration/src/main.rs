@@ -35,7 +35,7 @@ async fn main() {
     let app = Router::new()
         .route("/:flows_user/:flow_id/listen", post(listen))
         .route("/:flows_user/:flow_id/revoke", post(revoke))
-        .route("/:flows_user/:flow_id/:token/:api/proxy/*path", any(proxy))
+        .route("/proxy/:api/*path", any(proxy))
         .route("/event/:token", get(event))
         .route("/connected/:flows_user", get(connected))
         .route("/static/*path", get(static_path))
