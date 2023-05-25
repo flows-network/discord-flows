@@ -1,9 +1,9 @@
-use crate::route::{connected, event, listen, revoke, static_path};
+use crate::route::{connected, event, listen, proxy, revoke, static_path};
 
 use std::sync::Arc;
 
 use axum::{
-    routing::{get, post},
+    routing::{any, get, post},
     Router,
 };
 use include_dir::{include_dir, Dir};
@@ -19,9 +19,10 @@ mod state;
 mod utils;
 
 lazy_static::lazy_static! {
-    static ref HOOK_URL: String =
-        std::env::var("PLATFORM_HOOK_URL").unwrap_or(String::from("https://code.flows.network/hook/discord/message"));
-    static ref DEFAULT_TOKEN: String = std::env::var("DEFAULT_BOT_TOKEN").unwrap();
+    static ref HOOK_URL: String = String::from(
+        std::option_env!("PLATFORM_HOOK_URL").unwrap_or("https://code.flows.network/hook/discord/message")
+    );
+    static ref DEFAULT_TOKEN: String = String::from(std::option_env!("DEFAULT_TOKEN").unwrap());
 }
 static STATIC_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/static");
 
@@ -34,6 +35,7 @@ async fn main() {
     let app = Router::new()
         .route("/:flows_user/:flow_id/listen", post(listen))
         .route("/:flows_user/:flow_id/revoke", post(revoke))
+        .route("/:flows_user/:flow_id/:token/:api/proxy/*path", any(proxy))
         .route("/event/:token", get(event))
         .route("/connected/:flows_user", get(connected))
         .route("/static/*path", get(static_path))
