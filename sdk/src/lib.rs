@@ -16,6 +16,8 @@ const API_PREFIX: &str = match std::option_env!("DISCORD_API_PREFIX") {
     None => "https://discord.flows.network",
 };
 
+const DEFAULT_BOT_PLACEHOLDER: &str = "DEFAULT_BOT";
+
 extern "C" {
     // Flag if current running is for listening(1) or message receving(0)
     fn is_listening() -> i32;
@@ -100,7 +102,7 @@ impl Bot {
 impl Display for Bot {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Bot::Default => f.write_str("DEFAULT_BOT"),
+            Bot::Default => f.write_str(DEFAULT_BOT_PLACEHOLDER),
             Bot::Provided(token) => f.write_str(&token),
         }
     }
@@ -218,7 +220,7 @@ where
     S: Into<Bot>,
 {
     match bot.into() {
-        Bot::Default => HttpBuilder::new("DEFAULT_BOT"),
+        Bot::Default => HttpBuilder::new(DEFAULT_BOT_PLACEHOLDER),
         Bot::Provided(token) => HttpBuilder::new(token),
     }
     .build()

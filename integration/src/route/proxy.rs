@@ -6,7 +6,7 @@ use axum::{
 use reqwest::Request as RRequest;
 use serde::Deserialize;
 
-use crate::{shared::get_client, DEFAULT_TOKEN};
+use crate::{shared::get_client, DEFAULT_BOT_PLACEHOLDER, DEFAULT_TOKEN};
 
 #[derive(Deserialize)]
 pub struct PF {
@@ -26,7 +26,7 @@ pub async fn proxy(Path(PF { api, path }): Path<PF>, mut req: Request<Body>) -> 
     let x_token = hds.remove("Authorization").unwrap();
     let token = x_token.to_str().unwrap().strip_prefix("Bot ").unwrap();
 
-    let token = if token == "DEFAULT_BOT" {
+    let token = if token == DEFAULT_BOT_PLACEHOLDER {
         &*DEFAULT_TOKEN
     } else {
         token
@@ -53,8 +53,6 @@ pub async fn proxy(Path(PF { api, path }): Path<PF>, mut req: Request<Body>) -> 
     hds.remove("Accept-Encoding");
 
     let new_req = RRequest::try_from(req).unwrap();
-
-    println!("{:#?}", new_req);
 
     let client = get_client();
     let resp = client.execute(new_req).await;
