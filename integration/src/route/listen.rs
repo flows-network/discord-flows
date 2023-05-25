@@ -9,6 +9,7 @@ use crate::{
         database::{del_listener_by_token, safe_shutdown},
         http::check_token,
     },
+    DEFAULT_BOT_PLACEHOLDER,
 };
 
 pub async fn listen(
@@ -19,7 +20,7 @@ pub async fn listen(
     State(state): State<AppState>,
     Query(ListenerQuery { bot_token }): Query<ListenerQuery>,
 ) -> Result<StatusCode, String> {
-    if !check_token(&bot_token).await {
+    if bot_token != DEFAULT_BOT_PLACEHOLDER && !check_token(&bot_token).await {
         return Err("Unauthorized token".to_string());
     }
 
