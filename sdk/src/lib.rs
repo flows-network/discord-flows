@@ -220,11 +220,15 @@ where
 
 /// Get a Discord Client as a bot represented by `bot_token`
 #[inline]
-pub fn get_client<S>(bot_token: S) -> Http
+pub fn get_client<S>(bot: S) -> Http
 where
-    S: AsRef<str>,
+    S: Into<Bot>,
 {
-    HttpBuilder::new(bot_token).build()
+    match bot.into() {
+        Bot::Default => HttpBuilder::new("DEFAULT_BOT"),
+        Bot::Provided(token) => HttpBuilder::new(token),
+    }
+    .build()
 }
 
 fn event_from_subcription() -> Option<Message> {
