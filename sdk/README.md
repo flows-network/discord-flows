@@ -12,7 +12,7 @@
 
 ## Quick Start
 
-There is a echo bot, but plain text:
+This is a plain text echo bot.
 
 ```rust
 use discord_flows::{get_client, listen_to_event, model::Message};
@@ -54,7 +54,7 @@ is called with received `Message`.
 
 ## Creating a Bot Account
 
-The following is excerpted from
+Some of the following are excerpts from
 [discord.py docs](https://discordpy.readthedocs.io/en/stable/discord.html)
 
 1. Make sure you’re logged on to the Discord [website](https://discord.com/).
@@ -65,6 +65,8 @@ The following is excerpted from
 ![fill-name](https://res.cloudinary.com/wasm-reactor/image/upload/v1684130273/extension/discord/fill-name_jlxnq9.png)
 5. Navigate to the “Bot”.
 6. Make sure that Public Bot is ticked if you want others to invite your bot.
+And tick all the options of the "Privileged Gateway Intents".
+![Privileged Gateway Intents](https://res.cloudinary.com/wasm-reactor/image/upload/v1685068895/extension/discord/intents_sqxirg.png)
 7. Click on the "Reset Token" button.
 ![reset-token](https://res.cloudinary.com/wasm-reactor/image/upload/v1684130273/extension/discord/reset-token_hbgjof.png)
 8. Confirm reset by clicking "Yes, do it!" button.
@@ -99,7 +101,45 @@ If you want to invite your bot you must create an invite URL for it.
 6. Tick the permissions required for your bot to function under “Bot Permissions”.
   - Please be aware of the consequences of requiring your bot to have the “Administrator” permission.
   - Bot owners must have 2FA enabled for certain actions and permissions when added in servers that have Server-Wide 2FA enabled. Check the 2FA support page for more information.
-    ![discord_oauth2_perm](https://res.cloudinary.com/wasm-reactor/image/upload/v1684130895/extension/discord/discord_oauth2_scope_tpxmka.webp)
+    ![discord_oauth2_perm](https://res.cloudinary.com/wasm-reactor/image/upload/v1684130895/extension/discord/discord_oauth2_perms_eskbwl.webp)
 7. Now the resulting URL can be used to add your bot to a server. Copy and paste the URL into your browser, choose a server to invite the bot to, and click “Authorize”.
 
 > The person adding the bot needs “Manage Server” permissions to do so.
+
+
+## Using the default Bot
+If you don't want to create your own Discord Bot, we have created a pub Bot which can be used by all users.
+
+```rust
+use discord_flows::{get_client, listen_to_event, model::Message, Bot};
+
+#[no_mangle]
+#[tokio::main(flavor = "current_thread")]
+pub async fn run() {
+    listen_to_event(Bot::Default, move |msg| handle(msg)).await;
+}
+
+async fn handle(msg: Message) {
+    let client = get_client(Bot::Default);
+    let channel_id = msg.channel_id;
+    let content = msg.content;
+
+    if msg.author.bot {
+        return;
+    }
+
+    _ = client
+        .send_message(
+            channel_id.into(),
+            &serde_json::json!({
+                "content": content,
+            }),
+        )
+        .await;
+}
+```
+
+To invite this public Bot, you should compose the auth url with the permissions and scope
+and replace the `client_id` by `1090851501473271919`.
+For example, if the scope is `bot` and permissions is `Send Messages` then the auth url should look like:
+https://discord.com/api/oauth2/authorize?client_id=1090851501473271919&permissions=2048&scope=bot
