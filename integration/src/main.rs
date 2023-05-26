@@ -19,9 +19,8 @@ mod state;
 mod utils;
 
 lazy_static::lazy_static! {
-    static ref HOOK_URL: String = String::from(
-        std::option_env!("PLATFORM_HOOK_URL").unwrap_or("https://code.flows.network/hook/discord/message")
-    );
+    static ref HOOK_URL: String =
+        std::env::var("PLATFORM_HOOK_URL").unwrap_or(String::from("https://code.flows.network/hook/discord/message"));
     static ref DEFAULT_TOKEN: String = std::env::var("DEFAULT_TOKEN").unwrap();
 }
 static STATIC_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/static");
