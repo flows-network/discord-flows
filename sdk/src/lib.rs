@@ -1,6 +1,9 @@
 #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"))]
 
-use std::{fmt::Display, future::Future};
+use std::{
+    fmt::{Display, Write},
+    future::Future,
+};
 
 pub mod http;
 
@@ -10,6 +13,7 @@ use flowsnet_platform_sdk::write_error_log;
 use http::{Http, HttpBuilder};
 use http_req::request;
 use model::Message;
+use serenity::model::prelude::GuildId;
 
 const API_PREFIX: &str = match std::option_env!("DISCORD_API_PREFIX") {
     Some(v) => v,
@@ -89,7 +93,7 @@ where
 }
 
 pub enum Bot {
-    Default,
+    Default(GuildId),
     Provided(String),
 }
 
@@ -102,15 +106,14 @@ impl Bot {
 impl Display for Bot {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Bot::Default => f.write_str(DEFAULT_BOT_PLACEHOLDER),
-            Bot::Provided(token) => f.write_str(&token),
-        }
-    }
-}
+            Bot::Default(guild_id) => {
+                f.write_str(DEFAULT_BOT_PLACEHOLDER)?;
+                f.write_char(':')?;
+                f.write_str(&guild_id.as_u64().to_string())
+            }
 
-impl Default for Bot {
-    fn default() -> Self {
-        Bot::Default
+            Bot::Provided(token) => f.write_str(token),
+        }
     }
 }
 
@@ -123,24 +126,6 @@ impl From<String> for Bot {
 impl From<&str> for Bot {
     fn from(value: &str) -> Self {
         Bot::new(value)
-    }
-}
-
-impl From<Option<String>> for Bot {
-    fn from(value: Option<String>) -> Self {
-        match value {
-            Some(v) => Bot::new(v),
-            None => Bot::default(),
-        }
-    }
-}
-
-impl From<Option<&str>> for Bot {
-    fn from(value: Option<&str>) -> Self {
-        match value {
-            Some(v) => Bot::new(v),
-            None => Bot::default(),
-        }
     }
 }
 
@@ -165,9 +150,11 @@ impl From<Option<&str>> for Bot {
 ///
 /// ## Use the token provided by flows.network
 /// ```rust
+/// use serenity::model::prelude::GuildId;
+///
 /// #[tokio::main]
 /// pub async run() {
-///     listen_to_event(Bot::default(), |msg| async {
+///     listen_to_event(Bot::Default(GuildId(123456)), |msg| async {
 ///         todo!()
 ///     }).await;
 /// }
@@ -220,7 +207,9 @@ where
     S: Into<Bot>,
 {
     match bot.into() {
-        Bot::Default => HttpBuilder::new(DEFAULT_BOT_PLACEHOLDER),
+        Bot::Default(guild_id) => {
+            HttpBuilder::new(format!("{}{}", DEFAULT_BOT_PLACEHOLDER, guild_id))
+        }
         Bot::Provided(token) => HttpBuilder::new(token),
     }
     .build()
