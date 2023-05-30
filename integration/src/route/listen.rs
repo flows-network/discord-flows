@@ -1,9 +1,8 @@
 use axum::extract::{Path, Query, State};
 use reqwest::StatusCode;
-use sqlx::PgPool;
 
 use crate::{
-    model::{Bot, Flow, ListenerQuery},
+    model::{Flow, ListenerQuery},
     state::AppState,
     utils::{
         database::{del_listener_by_token, safe_shutdown},
@@ -19,12 +18,21 @@ pub async fn listen(
     }): Path<Flow>,
     State(state): State<AppState>,
     Query(ListenerQuery { bot_token }): Query<ListenerQuery>,
-) -> Result<StatusCode, String> {
-    if bot_token != DEFAULT_BOT_PLACEHOLDER && !check_token(&bot_token).await {
-        return Err("Unauthorized token".to_string());
+) -> Result<StatusCode, (StatusCode, String)> {
+    match bot_token.strip_prefix(DEFAULT_BOT_PLACEHOLDER) {
+        Some(gid) if filter::insert_gid(gid, &state.pool).await => {
+            listener::insert_listener(&flow_id, &flows_user, DEFAULT_BOT_PLACEHOLDER, &state.pool)
+                .await?;
+            return Ok(StatusCode::OK);
+        }
+        _ => (),
     }
 
-    if let Some(bt) = select_old(&flow_id, &flows_user, &bot_token, &state.pool).await {
+    if !check_token(&bot_token).await {
+        return Err((StatusCode::FORBIDDEN, "Unauthorized token".to_string()));
+    }
+
+    if let Some(bt) = listener::select_old(&flow_id, &flows_user, &bot_token, &state.pool).await {
         if bt.token == bot_token {
             return Ok(StatusCode::OK);
         }
@@ -32,7 +40,7 @@ pub async fn listen(
         safe_shutdown(&bt.token, &state.pool).await;
     }
 
-    insert_listener(&flow_id, &flows_user, &bot_token, &state.pool).await?;
+    listener::insert_listener(&flow_id, &flows_user, &bot_token, &state.pool).await?;
 
     tokio::spawn(async move {
         let cloned = state.pool.clone();
@@ -49,46 +57,67 @@ pub async fn listen(
     Ok(StatusCode::OK)
 }
 
-async fn insert_listener(
-    flow_id: &str,
-    flows_user: &str,
-    bot_token: &str,
-    pool: &PgPool,
-) -> Result<(), String> {
-    let insert = "
+mod listener {
+    use reqwest::StatusCode;
+    use sqlx::PgPool;
+
+    use crate::model::Bot;
+
+    pub async fn insert_listener(
+        flow_id: &str,
+        flows_user: &str,
+        bot_token: &str,
+        pool: &PgPool,
+    ) -> Result<(), (StatusCode, String)> {
+        let insert = "
         INSERT INTO listener(flow_id, flows_user, bot_token)
         VALUES ($1, $2, $3)
         ON CONFLICT (flow_id, flows_user)
         DO UPDATE SET bot_token = excluded.bot_token
     ";
-    _ = sqlx::query(insert)
-        .bind(flow_id)
-        .bind(flows_user)
-        .bind(bot_token)
-        .execute(pool)
-        .await
-        .map_err(|e| e.to_string())?;
+        _ = sqlx::query(insert)
+            .bind(flow_id)
+            .bind(flows_user)
+            .bind(bot_token)
+            .execute(pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    Ok(())
-}
+        Ok(())
+    }
 
-async fn select_old(
-    flow_id: &str,
-    flows_user: &str,
-    bot_token: &str,
-    pool: &PgPool,
-) -> Option<Bot> {
-    // select old token
-    let select = "
+    pub async fn select_old(
+        flow_id: &str,
+        flows_user: &str,
+        bot_token: &str,
+        pool: &PgPool,
+    ) -> Option<Bot> {
+        // select old token
+        let select = "
         SELECT bot_token
         FROM listener
         WHERE flow_id = $1 AND flows_user = $2
     ";
-    sqlx::query_as(select)
-        .bind(flow_id)
-        .bind(flows_user)
-        .bind(bot_token)
-        .fetch_optional(pool)
-        .await
-        .ok()?
+        sqlx::query_as(select)
+            .bind(flow_id)
+            .bind(flows_user)
+            .bind(bot_token)
+            .fetch_optional(pool)
+            .await
+            .ok()?
+    }
+}
+
+mod filter {
+    use sqlx::PgPool;
+
+    pub async fn insert_gid(gid: &str, pool: &PgPool) -> bool {
+        let insert = "
+            INSERT INTO filter
+            VALUES ($1);
+        ";
+        let result = sqlx::query(insert).bind(gid).execute(pool).await;
+
+        dbg!(result).is_ok_and(|rq| rq.rows_affected() != 0)
+    }
 }

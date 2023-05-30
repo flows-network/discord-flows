@@ -4,3 +4,7 @@ CREATE TABLE IF NOT EXISTS listener (
     bot_token text NOT NULL,
     PRIMARY KEY (flow_id, flows_user)
 );
+
+CREATE TABLE IF NOT EXISTS filter (
+    guild_id text NOT NULL PRIMARY KEY
+);

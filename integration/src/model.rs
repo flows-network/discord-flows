@@ -21,3 +21,8 @@ pub struct Count {
 pub struct ListenerQuery {
     pub bot_token: String,
 }
+
+#[derive(sqlx::FromRow)]
+pub struct Gid {
+    pub guild_id: String,
+}
