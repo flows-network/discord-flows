@@ -101,6 +101,17 @@ impl Bot {
     pub fn new<S: Into<String>>(token: S) -> Self {
         Self::Provided(token.into())
     }
+
+    pub fn provide_token<S: Into<String>>(token: S) -> Self {
+        Self::new(token)
+    }
+
+    pub fn default_bot(guild_id: GuildId, channel_id: ChannelId) -> Self {
+        Self::Default {
+            guild_id,
+            channel_id,
+        }
+    }
 }
 
 impl Display for Bot {
