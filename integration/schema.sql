@@ -6,5 +6,7 @@ CREATE TABLE IF NOT EXISTS listener (
 );
 
 CREATE TABLE IF NOT EXISTS filter (
-    guild_id text NOT NULL PRIMARY KEY
+    guild_id text NOT NULL,
+    channel_id text NOT NULL,
+    PRIMARY KEY (guild_id, channel_id)
 );

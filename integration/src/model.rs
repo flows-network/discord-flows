@@ -22,7 +22,7 @@ pub struct ListenerQuery {
     pub bot_token: String,
 }
 
-#[derive(sqlx::FromRow)]
+#[derive(Debug, sqlx::FromRow)]
 pub struct Gid {
     pub guild_id: String,
 }

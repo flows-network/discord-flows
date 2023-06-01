@@ -19,8 +19,8 @@ pub async fn listen(
     State(state): State<AppState>,
     Query(ListenerQuery { bot_token }): Query<ListenerQuery>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    match bot_token.strip_prefix(DEFAULT_BOT_PLACEHOLDER) {
-        Some(gid) if filter::insert_gid(gid, &state.pool).await => {
+    match bot_token.split_once(DEFAULT_BOT_PLACEHOLDER) {
+        Some((gid, cid)) if filter::insert_gcid(gid, cid, &state.pool).await => {
             listener::insert_listener(&flow_id, &flows_user, DEFAULT_BOT_PLACEHOLDER, &state.pool)
                 .await?;
             return Ok(StatusCode::OK);
@@ -111,13 +111,16 @@ mod listener {
 mod filter {
     use sqlx::PgPool;
 
-    pub async fn insert_gid(gid: &str, pool: &PgPool) -> bool {
+    pub async fn insert_gcid(gid: &str, cid: &str, pool: &PgPool) -> bool {
         let insert = "
             INSERT INTO filter
-            VALUES ($1);
+            VALUES ($1, $2);
         ";
-        let result = sqlx::query(insert).bind(gid).execute(pool).await;
-
-        dbg!(result).is_ok_and(|rq| rq.rows_affected() != 0)
+        sqlx::query(insert)
+            .bind(gid)
+            .bind(cid)
+            .execute(pool)
+            .await
+            .is_ok_and(|rq| rq.rows_affected() != 0)
     }
 }

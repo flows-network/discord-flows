@@ -50,7 +50,7 @@ async fn init() -> AppState {
     #[cfg(feature = "debug")]
     env_logger::init();
 
-    let db_url = std::env::var("DATABASE_URL").unwrap();
+    let db_url = std::env::var("DATABASE_URL").expect("env `DATABASE_URL` not present");
     let pool = Arc::new(PgPool::connect(&db_url).await.unwrap());
 
     _ = pool.execute(include_str!("../schema.sql")).await.unwrap();

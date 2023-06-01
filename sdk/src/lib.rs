@@ -1,9 +1,6 @@
 #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"))]
 
-use std::{
-    fmt::{Display, Write},
-    future::Future,
-};
+use std::{fmt::Display, future::Future};
 
 pub mod http;
 
@@ -13,7 +10,7 @@ use flowsnet_platform_sdk::write_error_log;
 use http::{Http, HttpBuilder};
 use http_req::request;
 use model::Message;
-use serenity::model::prelude::GuildId;
+use serenity::model::prelude::{ChannelId, GuildId};
 
 const API_PREFIX: &str = match std::option_env!("DISCORD_API_PREFIX") {
     Some(v) => v,
@@ -93,7 +90,10 @@ where
 }
 
 pub enum Bot {
-    Default(GuildId),
+    Default {
+        guild_id: GuildId,
+        channel_id: ChannelId,
+    },
     Provided(String),
 }
 
@@ -106,10 +106,13 @@ impl Bot {
 impl Display for Bot {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Bot::Default(guild_id) => {
+            Bot::Default {
+                guild_id,
+                channel_id,
+            } => {
+                f.write_str(&guild_id.as_u64().to_string())?;
                 f.write_str(DEFAULT_BOT_PLACEHOLDER)?;
-                f.write_char(':')?;
-                f.write_str(&guild_id.as_u64().to_string())
+                f.write_str(&channel_id.as_u64().to_string())
             }
 
             Bot::Provided(token) => f.write_str(token),
@@ -206,13 +209,7 @@ pub fn get_client<S>(bot: S) -> Http
 where
     S: Into<Bot>,
 {
-    match bot.into() {
-        Bot::Default(guild_id) => {
-            HttpBuilder::new(format!("{}{}", DEFAULT_BOT_PLACEHOLDER, guild_id))
-        }
-        Bot::Provided(token) => HttpBuilder::new(token),
-    }
-    .build()
+    HttpBuilder::new(bot.into().to_string()).build()
 }
 
 fn event_from_subcription() -> Option<Message> {

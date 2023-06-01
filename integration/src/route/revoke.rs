@@ -16,27 +16,28 @@ pub async fn revoke(
     State(state): State<AppState>,
     Query(ListenerQuery { bot_token }): Query<ListenerQuery>,
 ) -> Result<StatusCode, String> {
-    if bot_token.starts_with(DEFAULT_BOT_PLACEHOLDER) {
-        if let Some(gid) = bot_token.strip_prefix(DEFAULT_BOT_PLACEHOLDER) {
-            filter::delete_gid(gid, &state.pool).await;
-            Ok(StatusCode::OK)
-        } else {
-            Ok(StatusCode::FORBIDDEN)
+    match bot_token.split_once(DEFAULT_BOT_PLACEHOLDER) {
+        Some((gid, cid)) if filter::delete_gcid(gid, cid, &state.pool).await => Ok(StatusCode::OK),
+        _ => {
+            safe_shutdown(&bot_token, &state.pool).await;
+            del_listener_by_token(&flow_id, &flows_user, &bot_token, &state.pool).await
         }
-    } else {
-        safe_shutdown(&bot_token, &state.pool).await;
-        del_listener_by_token(&flow_id, &flows_user, &bot_token, &state.pool).await
     }
 }
 
 mod filter {
     use sqlx::PgPool;
 
-    pub async fn delete_gid(gid: &str, pool: &PgPool) {
+    pub async fn delete_gcid(gid: &str, cid: &str, pool: &PgPool) -> bool {
         let delete = "
             DELETE FROM filter
-            WHERE guild_id = $1
+            WHERE guild_id = $1 AND channel_id = $2
         ";
-        _ = sqlx::query(delete).bind(gid).execute(pool).await;
+        sqlx::query(delete)
+            .bind(gid)
+            .bind(cid)
+            .execute(pool)
+            .await
+            .is_ok_and(|rq| rq.rows_affected() != 0)
     }
 }
