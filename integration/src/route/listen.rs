@@ -19,28 +19,28 @@ pub async fn listen(
     State(state): State<AppState>,
     Query(ListenerQuery { bot_token }): Query<ListenerQuery>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    match bot_token.split_once(DEFAULT_BOT_PLACEHOLDER) {
-        Some((gid, cid)) if filter::insert_gcid(gid, cid, &state.pool).await => {
-            listener::insert_listener(&flow_id, &flows_user, DEFAULT_BOT_PLACEHOLDER, &state.pool)
-                .await?;
-            return Ok(StatusCode::OK);
+    let pool = &state.pool;
+
+    if let Some((gid, cid)) = bot_token.split_once(DEFAULT_BOT_PLACEHOLDER) {
+        if filter::insert_gcid(pool, gid, cid, &flow_id).await {
+            listener::insert_listener(&flow_id, &flows_user, DEFAULT_BOT_PLACEHOLDER, pool).await?;
         }
-        _ => (),
+        return Ok(StatusCode::OK);
     }
 
     if !check_token(&bot_token).await {
         return Err((StatusCode::FORBIDDEN, "Unauthorized token".to_string()));
     }
 
-    if let Some(bt) = listener::select_old(&flow_id, &flows_user, &bot_token, &state.pool).await {
+    if let Some(bt) = listener::select_old(&flow_id, &flows_user, &bot_token, pool).await {
         if bt.token == bot_token {
             return Ok(StatusCode::OK);
         }
 
-        safe_shutdown(&bt.token, &state.pool).await;
+        safe_shutdown(&bt.token, pool).await;
     }
 
-    listener::insert_listener(&flow_id, &flows_user, &bot_token, &state.pool).await?;
+    listener::insert_listener(&flow_id, &flows_user, &bot_token, pool).await?;
 
     tokio::spawn(async move {
         let cloned = state.pool.clone();
@@ -111,14 +111,15 @@ mod listener {
 mod filter {
     use sqlx::PgPool;
 
-    pub async fn insert_gcid(gid: &str, cid: &str, pool: &PgPool) -> bool {
+    pub async fn insert_gcid(pool: &PgPool, gid: &str, cid: &str, flow_id: &str) -> bool {
         let insert = "
             INSERT INTO filter
-            VALUES ($1, $2);
+            VALUES ($1, $2, $3);
         ";
         sqlx::query(insert)
             .bind(gid)
             .bind(cid)
+            .bind(flow_id)
             .execute(pool)
             .await
             .is_ok_and(|rq| rq.rows_affected() != 0)
