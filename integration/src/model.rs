@@ -23,6 +23,6 @@ pub struct ListenerQuery {
 }
 
 #[derive(Debug, sqlx::FromRow)]
-pub struct Gid {
-    pub guild_id: String,
+pub struct Fid {
+    pub flow_id: String,
 }

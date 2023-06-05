@@ -12,34 +12,31 @@ pub async fn event(
 ) -> Result<Json<Vec<Value>>, String> {
     let mut flows = Vec::new();
 
-    let sql = if token == DEFAULT_BOT_PLACEHOLDER {
-        "
-        WITH filtering AS (
-            SELECT
-                flow_id
-            FROM
-                filter
-        )
-
-        SELECT
-            listener.flows_user,
-            listener.flow_id
-        FROM
-            listener
-        INNER JOIN filtering
-        ON listener.flow_id = filtering.flow_id
-        WHERE bot_token = $1
-        "
-    } else {
-        "
-        SELECT flows_user, flow_id
-        FROM listener
-        WHERE bot_token = $1
-        "
+    let query = match token.strip_prefix(DEFAULT_BOT_PLACEHOLDER) {
+        Some(flow_id) => {
+            let sql = "
+                SELECT
+                    flows_user,
+                    flow_id
+                FROM
+                    listener
+                WHERE bot_token = $1 AND flow_id = $2
+        ";
+            sqlx::query_as(sql)
+                .bind(DEFAULT_BOT_PLACEHOLDER)
+                .bind(flow_id)
+        }
+        None => {
+            let sql = "
+                SELECT flows_user, flow_id
+                FROM listener
+                WHERE bot_token = $1
+            ";
+            sqlx::query_as(sql).bind(token)
+        }
     };
 
-    let fs: Vec<Flow> = sqlx::query_as(sql)
-        .bind(token)
+    let fs: Vec<Flow> = query
         .fetch_all(&*state.pool)
         .await
         .map_err(|e| e.to_string())?;
