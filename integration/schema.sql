@@ -1,13 +1,7 @@
 CREATE TABLE IF NOT EXISTS listener (
     flow_id text NOT NULL,
     flows_user text NOT NULL,
+    channel_id text,
     bot_token text NOT NULL,
     PRIMARY KEY (flow_id, flows_user)
-);
-
-CREATE TABLE IF NOT EXISTS filter (
-    guild_id text NOT NULL,
-    channel_id text NOT NULL,
-    flow_id text NOT NULL,
-    PRIMARY KEY (guild_id, channel_id)
 );

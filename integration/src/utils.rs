@@ -31,16 +31,18 @@ pub mod database {
     pub async fn del_listener_by_token(
         flow_id: &str,
         flows_user: &str,
+        channel_id: &str,
         bot_token: &str,
         pool: &PgPool,
     ) -> Result<StatusCode, String> {
         let delete = "
             DELETE FROM listener
-            WHERE flow_id = $1 AND flows_user = $2 AND bot_token = $3
+            WHERE flow_id = $1 AND flows_user = $2 AND channel_id = $3 AND bot_token = $4
         ";
         sqlx::query(delete)
             .bind(flow_id)
             .bind(flows_user)
+            .bind(channel_id)
             .bind(bot_token)
             .execute(pool)
             .await

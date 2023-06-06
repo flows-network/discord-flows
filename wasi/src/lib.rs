@@ -1,7 +1,4 @@
 use discord_flows::model::Message;
-use http_req::request;
-
-const API_PREFIX: &str = "https://discord.flows.network";
 
 extern "C" {
     fn get_event_body_length() -> i32;
@@ -18,20 +15,13 @@ pub unsafe fn message() {
         if msg.author.bot || msg.author.name == "bot_name" {}
 
         let headers = headers_from_subcription().unwrap_or_default();
-        let uuid = headers
+        let flows = headers
             .into_iter()
-            .find(|(k, _)| k.to_lowercase() == "x-discord-token")
+            .find(|(k, _)| k.to_lowercase() == "x-discord-flows")
             .unwrap_or((String::new(), String::new()))
             .1;
 
-        let mut writer = Vec::new();
-        let res = request::get(format!("{}/event/{}", API_PREFIX, uuid), &mut writer).unwrap();
-
-        if res.status_code().is_success() {
-            if let Ok(flows) = String::from_utf8(writer) {
-                set_flows(flows.as_ptr(), flows.len() as i32);
-            }
-        }
+        set_flows(flows.as_ptr(), flows.len() as i32);
     }
 }
 

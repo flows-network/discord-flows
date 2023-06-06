@@ -1,16 +1,16 @@
 #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"))]
 
-use std::{fmt::Display, future::Future};
+use std::future::Future;
 
 pub mod http;
 
 pub mod model;
 
+use async_trait::async_trait;
 use flowsnet_platform_sdk::write_error_log;
 use http::{Http, HttpBuilder};
 use http_req::request;
 use model::Message;
-use serenity::model::prelude::{ChannelId, GuildId};
 
 const API_PREFIX: &str = match std::option_env!("DISCORD_API_PREFIX") {
     Some(v) => v,
@@ -51,95 +51,66 @@ pub(crate) unsafe fn _get_flow_id() -> String {
     String::from_utf8(flow_id).unwrap()
 }
 
-/// Revoke previous registered listener of current flow.
-///
-/// Most of the time you do not need to call this function. As inside
-/// the [listen_to_event()] it will revoke previous registered
-/// listener, so the only circumstance you need this function is when
-/// you want to change the listener from Discord to others.
-pub fn revoke_listeners<S>(bot: S)
-where
-    S: Into<Bot>,
-{
-    unsafe {
-        let flows_user = _get_flows_user();
-        let flow_id = _get_flow_id();
+#[async_trait]
+pub trait Bot {
+    fn get_token(&self) -> String;
 
-        let mut writer = Vec::new();
-        let res = request::post(
-            format!(
-                "{}/{}/{}/revoke?bot_token={}",
-                API_PREFIX,
-                flows_user,
-                flow_id,
-                bot.into(),
-            ),
-            &[],
-            &mut writer,
-        )
-        .unwrap();
+    /// Create a listener for Discord bot provided by flows.network
+    ///
+    /// Before creating the listener, this function will revoke previous
+    /// registered listener of current flow so you don't need to do it manually.
+    ///
+    /// `callback` is a callback function which will be called when new `Message` is received.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// #[tokio::main]
+    /// pub async run() {
+    ///     let bot = DefaultBot {};
+    ///     bot.listen_to_channel(123456, |msg| async {
+    ///         todo!()
+    ///     }).await;
+    /// }
+    /// ```
+    async fn listen_to_channel<F, Fut>(&self, channel_id: u64, callback: F)
+    where
+        F: FnOnce(Message) -> Fut + Send,
+        Fut: Future<Output = ()> + Send,
+    {
+        listen_to_event(&self.get_token(), Some(channel_id), callback).await;
+    }
 
-        match res.status_code().is_success() {
-            true => (),
-            false => {
-                write_error_log!(String::from_utf8_lossy(&writer));
-                set_error_code(format!("{}", res.status_code()).parse::<i16>().unwrap_or(0));
-            }
-        }
+    /// Get a Discord Client as a bot represented by `bot_token`
+    #[inline]
+    fn get_client(&self) -> Http {
+        HttpBuilder::new(self.get_token()).build()
     }
 }
 
-pub enum Bot {
-    Default {
-        guild_id: GuildId,
-        channel_id: ChannelId,
-    },
-    Provided(String),
+pub struct DefaultBot {}
+
+impl Bot for DefaultBot {
+    fn get_token(&self) -> String {
+        String::from(DEFAULT_BOT_PLACEHOLDER)
+    }
 }
 
-impl Bot {
+pub struct ProvidedBot {
+    token: String,
+}
+
+impl Bot for ProvidedBot {
+    fn get_token(&self) -> String {
+        self.token.clone()
+    }
+}
+
+impl ProvidedBot {
     pub fn new<S: Into<String>>(token: S) -> Self {
-        Self::Provided(token.into())
-    }
-
-    pub fn provide_token<S: Into<String>>(token: S) -> Self {
-        Self::new(token)
-    }
-
-    pub fn default_bot(guild_id: GuildId, channel_id: ChannelId) -> Self {
-        Self::Default {
-            guild_id,
-            channel_id,
+        Self {
+            token: token.into(),
         }
-    }
-}
-
-impl Display for Bot {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Bot::Default {
-                guild_id,
-                channel_id,
-            } => {
-                f.write_str(&guild_id.as_u64().to_string())?;
-                f.write_str(DEFAULT_BOT_PLACEHOLDER)?;
-                f.write_str(&channel_id.as_u64().to_string())
-            }
-
-            Bot::Provided(token) => f.write_str(token),
-        }
-    }
-}
-
-impl From<String> for Bot {
-    fn from(value: String) -> Self {
-        Bot::new(value)
-    }
-}
-
-impl From<&str> for Bot {
-    fn from(value: &str) -> Self {
-        Bot::new(value)
     }
 }
 
@@ -152,32 +123,29 @@ impl From<&str> for Bot {
 ///
 /// # Example
 ///
-/// ## Provide token
 /// ```rust
 /// #[tokio::main]
 /// pub async run() {
-///     listen_to_event("YOUR BOT TOKEN", |msg| async {
+///     let bot = ProvidedBot::new("YOUR BOT TOKEN");
+///     bot.listen(|msg| async {
 ///         todo!()
 ///     }).await;
 /// }
 /// ```
-///
-/// ## Use the token provided by flows.network
-/// ```rust
-/// use serenity::model::prelude::GuildId;
-///
-/// #[tokio::main]
-/// pub async run() {
-///     listen_to_event(Bot::Default(GuildId(123456)), |msg| async {
-///         todo!()
-///     }).await;
-/// }
-/// ```
-pub async fn listen_to_event<S, F, Fut>(bot: S, callback: F)
+impl ProvidedBot {
+    pub async fn listen<F, Fut>(&self, callback: F)
+    where
+        F: FnOnce(Message) -> Fut + Send,
+        Fut: Future<Output = ()> + Send,
+    {
+        listen_to_event(&self.token, None, callback).await;
+    }
+}
+
+async fn listen_to_event<F, Fut>(token: &str, channel_id: Option<u64>, callback: F)
 where
-    S: Into<Bot>,
-    F: FnOnce(Message) -> Fut,
-    Fut: Future<Output = ()>,
+    F: FnOnce(Message) -> Fut + Send,
+    Fut: Future<Output = ()> + Send,
 {
     unsafe {
         match is_listening() {
@@ -189,11 +157,12 @@ where
                 let mut writer = Vec::new();
                 let res = request::post(
                     format!(
-                        "{}/{}/{}/listen?bot_token={}",
+                        "{}/{}/{}/{}/listen?bot_token={}",
                         API_PREFIX,
                         flows_user,
                         flow_id,
-                        bot.into(),
+                        channel_id.unwrap_or(0),
+                        token,
                     ),
                     &[],
                     &mut writer,
@@ -212,15 +181,6 @@ where
             }
         }
     }
-}
-
-/// Get a Discord Client as a bot represented by `bot_token`
-#[inline]
-pub fn get_client<S>(bot: S) -> Http
-where
-    S: Into<Bot>,
-{
-    HttpBuilder::new(bot.into().to_string()).build()
 }
 
 fn event_from_subcription() -> Option<Message> {

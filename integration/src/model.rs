@@ -1,9 +1,16 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, sqlx::FromRow)]
+#[derive(Serialize, Deserialize, sqlx::FromRow)]
 pub struct Flow {
     pub flows_user: String,
     pub flow_id: String,
+}
+
+#[derive(Serialize, Deserialize, sqlx::FromRow)]
+pub struct ListenPath {
+    pub flows_user: String,
+    pub flow_id: String,
+    pub channel_id: String,
 }
 
 #[derive(sqlx::FromRow)]
@@ -20,9 +27,4 @@ pub struct Count {
 #[derive(Deserialize)]
 pub struct ListenerQuery {
     pub bot_token: String,
-}
-
-#[derive(Debug, sqlx::FromRow)]
-pub struct Fid {
-    pub flow_id: String,
 }

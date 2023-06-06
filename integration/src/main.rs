@@ -1,4 +1,4 @@
-use crate::route::{connected, event, listen, proxy, revoke, static_path};
+use crate::route::{connected, listen, proxy, static_path};
 
 use std::sync::Arc;
 
@@ -32,10 +32,8 @@ async fn main() {
     let state = init().await;
 
     let app = Router::new()
-        .route("/:flows_user/:flow_id/listen", post(listen))
-        .route("/:flows_user/:flow_id/revoke", post(revoke))
+        .route("/:flows_user/:flow_id/:channel_id/listen", post(listen))
         .route("/proxy/:api/*path", any(proxy))
-        .route("/event/:token", get(event))
         .route("/connected/:flows_user", get(connected))
         .route("/static/*path", get(static_path))
         .with_state(state);
