@@ -67,7 +67,7 @@ pub trait Bot {
     /// ```rust
     /// #[tokio::main]
     /// pub async run() {
-    ///     let bot = DefaultBot {};
+    ///     let bot = DefaultBot;
     ///     bot.listen_to_channel(123456, |msg| async {
     ///         todo!()
     ///     }).await;
@@ -88,7 +88,7 @@ pub trait Bot {
     }
 }
 
-pub struct DefaultBot {}
+pub struct DefaultBot;
 
 impl Bot for DefaultBot {
     fn get_token(&self) -> String {
