@@ -173,8 +173,15 @@ where
                 match res.status_code().is_success() {
                     true => {
                         let output = match channel_id {
-                            Some(c) => format!("Listening to channel '{}'.", c),
-                            None => format!("Listening to all channels your bot is on."),
+                            Some(c) => format!(
+                                "[{}] Listening to channel '{}'.",
+                                std::env!("CARGO_CRATE_NAME"),
+                                c
+                            ),
+                            None => format!(
+                                "[{}] Listening to all channels your bot is on.",
+                                std::env!("CARGO_CRATE_NAME")
+                            ),
                         };
                         set_output(output.as_ptr(), output.len() as i32);
                     }
