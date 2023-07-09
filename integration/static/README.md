@@ -15,18 +15,18 @@
 This is a plain text echo bot.
 
 ```rust
-use discord_flows::{get_client, listen_to_event, model::Message, Bot};
+use discord_flows::{model::Message, Bot, ProvidedBot};
 
 #[no_mangle]
 #[tokio::main(flavor = "current_thread")]
 pub async fn run() {
     let token = std::env::var("DISCORD_TOKEN").unwrap();
-    listen_to_event(token.clone(), move |msg| handle(msg, token)).await;
-
+    let bot = ProvidedBot::new(token);
+    bot.listen(|msg| handle(&bot, msg)).await;
 }
 
-async fn handle(msg: Message, token: String) {
-    let client = get_client(token);
+async fn handle<B: Bot>(bot: &B, msg: Message) {
+    let client = bot.get_client();
     let channel_id = msg.channel_id;
     let content = msg.content;
 
@@ -111,16 +111,18 @@ If you want to invite your bot you must create an invite URL for it.
 If you don't want to create your own Discord Bot, we have created a pub Bot which can be used by all users.
 
 ```rust
-use discord_flows::{get_client, listen_to_event, model::Message, Bot};
+use discord_flows::{model::Message, Bot, DefaultBot};
 
 #[no_mangle]
 #[tokio::main(flavor = "current_thread")]
 pub async fn run() {
-    listen_to_event(Bot::Default, move |msg| handle(msg)).await;
+    let channel_id = 1104392662985220296; // Your channel id
+    let bot = DefaultBot {};
+    bot.listen_to_channel(channel_id, |msg| handle(&bot, msg)).await;
 }
 
-async fn handle(msg: Message) {
-    let client = get_client(Bot::Default);
+async fn handle<B: Bot>(bot: &B, msg: Message) {
+    let client = bot.get_client();
     let channel_id = msg.channel_id;
     let content = msg.content;
 
