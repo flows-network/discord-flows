@@ -31,6 +31,7 @@ extern "C" {
 
     fn get_event_body_length() -> i32;
     fn get_event_body(p: *mut u8) -> i32;
+    fn set_output(p: *const u8, len: i32);
     fn set_error_code(code: i16);
 }
 
@@ -169,9 +170,20 @@ where
                 )
                 .unwrap();
 
-                if !res.status_code().is_success() {
-                    write_error_log!(String::from_utf8_lossy(&writer));
-                    set_error_code(format!("{}", res.status_code()).parse::<i16>().unwrap_or(0));
+                match res.status_code().is_success() {
+                    true => {
+                        let output = match channel_id {
+                            Some(c) => format!("Listening to channel '{}'.", c),
+                            None => format!("Listening to all channels your bot is on."),
+                        };
+                        set_output(output.as_ptr(), output.len() as i32);
+                    }
+                    false => {
+                        write_error_log!(String::from_utf8_lossy(&writer));
+                        set_error_code(
+                            format!("{}", res.status_code()).parse::<i16>().unwrap_or(0),
+                        );
+                    }
                 }
             }
             _ => {
