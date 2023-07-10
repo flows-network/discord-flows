@@ -174,7 +174,7 @@ where
                     true => {
                         let output = match channel_id {
                             Some(c) => format!(
-                                "[{}] Listening to channel '{}'.",
+                                "[{}] Listening to channel `{}`.",
                                 std::env!("CARGO_CRATE_NAME"),
                                 c
                             ),
