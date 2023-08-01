@@ -10,7 +10,9 @@ use async_trait::async_trait;
 use flowsnet_platform_sdk::write_error_log;
 use http::{Http, HttpBuilder};
 use http_req::request;
-use model::Message;
+use model::{
+    application::interaction::application_command::ApplicationCommandInteraction, Message,
+};
 
 const API_PREFIX: &str = match std::option_env!("DISCORD_API_PREFIX") {
     Some(v) => v,
@@ -18,6 +20,11 @@ const API_PREFIX: &str = match std::option_env!("DISCORD_API_PREFIX") {
 };
 
 const DEFAULT_BOT_PLACEHOLDER: &str = "DEFAULT_BOT";
+
+pub enum EventModel {
+    Message(Message),
+    ApplicationCommand(ApplicationCommandInteraction),
+}
 
 extern "C" {
     // Flag if current running is for listening(1) or message receving(0)
@@ -31,6 +38,8 @@ extern "C" {
 
     fn get_event_body_length() -> i32;
     fn get_event_body(p: *mut u8) -> i32;
+    fn get_event_headers_length() -> i32;
+    fn get_event_headers(p: *mut u8) -> i32;
     fn set_output(p: *const u8, len: i32);
     fn set_error_code(code: i16);
 }
@@ -76,7 +85,7 @@ pub trait Bot {
     /// ```
     async fn listen_to_channel<F, Fut>(&self, channel_id: u64, callback: F)
     where
-        F: FnOnce(Message) -> Fut + Send,
+        F: FnOnce(EventModel) -> Fut + Send,
         Fut: Future<Output = ()> + Send,
     {
         listen_to_event(&self.get_token(), Some(channel_id), callback).await;
@@ -136,7 +145,7 @@ impl ProvidedBot {
 impl ProvidedBot {
     pub async fn listen<F, Fut>(&self, callback: F)
     where
-        F: FnOnce(Message) -> Fut + Send,
+        F: FnOnce(EventModel) -> Fut + Send,
         Fut: Future<Output = ()> + Send,
     {
         listen_to_event(&self.token, None, callback).await;
@@ -145,7 +154,7 @@ impl ProvidedBot {
 
 async fn listen_to_event<F, Fut>(token: &str, channel_id: Option<u64>, callback: F)
 where
-    F: FnOnce(Message) -> Fut + Send,
+    F: FnOnce(EventModel) -> Fut + Send,
     Fut: Future<Output = ()> + Send,
 {
     unsafe {
@@ -202,16 +211,45 @@ where
     }
 }
 
-fn event_from_subcription() -> Option<Message> {
+fn event_from_subcription() -> Option<EventModel> {
     unsafe {
+        let headers = headers_from_subcription().unwrap_or_default();
+        let event_model = headers
+            .into_iter()
+            .find(|(k, _)| k.to_lowercase() == "x-discord-event-model")
+            .unwrap_or((String::new(), String::new()))
+            .1;
+
         let l = get_event_body_length();
         let mut event_body = Vec::<u8>::with_capacity(l as usize);
         let c = get_event_body(event_body.as_mut_ptr());
         assert!(c == l);
         event_body.set_len(c as usize);
-        match serde_json::from_slice(&event_body) {
-            Ok(e) => Some(e),
-            Err(_) => None,
+
+        match event_model.as_str() {
+            "ApplicationCommand" => {
+                match serde_json::from_slice::<ApplicationCommandInteraction>(&event_body) {
+                    Ok(e) => Some(EventModel::ApplicationCommand(e)),
+                    Err(_) => None,
+                }
+            }
+            "Message" => match serde_json::from_slice::<Message>(&event_body) {
+                Ok(e) => Some(EventModel::Message(e)),
+                Err(_) => None,
+            },
+            _ => None,
         }
+    }
+}
+
+fn headers_from_subcription() -> Option<Vec<(String, String)>> {
+    unsafe {
+        let l = get_event_headers_length();
+        let mut event_body = Vec::<u8>::with_capacity(l as usize);
+        let c = get_event_headers(event_body.as_mut_ptr());
+        assert!(c == l);
+        event_body.set_len(c as usize);
+
+        serde_json::from_slice(&event_body).ok()
     }
 }

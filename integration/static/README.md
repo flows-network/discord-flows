@@ -15,33 +15,57 @@
 This is a plain text echo bot.
 
 ```rust
-use discord_flows::{model::Message, Bot, ProvidedBot};
+use discord_flows::{
+    model::application::interaction::InteractionResponseType, Bot, EventModel, ProvidedBot,
+};
 
 #[no_mangle]
 #[tokio::main(flavor = "current_thread")]
 pub async fn run() {
     let token = std::env::var("DISCORD_TOKEN").unwrap();
     let bot = ProvidedBot::new(token);
-    bot.listen(|msg| handle(&bot, msg)).await;
+    bot.listen(|em| handle(&bot, em)).await;
 }
 
-async fn handle<B: Bot>(bot: &B, msg: Message) {
-    let client = bot.get_client();
-    let channel_id = msg.channel_id;
-    let content = msg.content;
+async fn handle<B: Bot>(bot: &B, em: EventModel) {
+    match em {
+        // Slack command received
+        EventModel::ApplicationCommand(ac) => {
+            let client = bot.get_client();
 
-    if msg.author.bot {
-        return;
+            _ = client
+                .create_interaction_response(
+                    ac.id.into(),
+                    &ac.token,
+                    &serde_json::json!({
+                        "type": InteractionResponseType::ChannelMessageWithSource as u8,
+                        "data": {
+                            "content": "Pong"
+                        }
+                    }),
+                )
+                .await;
+        }
+        // Normal message received
+        EventModel::Message(msg) => {
+            let client = bot.get_client();
+            let channel_id = msg.channel_id;
+            let content = msg.content;
+
+            if msg.author.bot {
+                return;
+            }
+
+            _ = client
+                .send_message(
+                    channel_id.into(),
+                    &serde_json::json!({
+                        "content": content,
+                    }),
+                )
+                .await;
+        }
     }
-
-    _ = client
-        .send_message(
-            channel_id.into(),
-            &serde_json::json!({
-                "content": content,
-            }),
-        )
-        .await;
 }
 ```
 
@@ -111,33 +135,57 @@ If you want to invite your bot you must create an invite URL for it.
 If you don't want to create your own Discord Bot, we have created a pub Bot which can be used by all users.
 
 ```rust
-use discord_flows::{model::Message, Bot, DefaultBot};
+use discord_flows::{
+    model::application::interaction::InteractionResponseType, Bot, EventModel, DefaultBot,
+};
 
 #[no_mangle]
 #[tokio::main(flavor = "current_thread")]
 pub async fn run() {
     let channel_id = 1104392662985220296; // Your channel id
     let bot = DefaultBot {};
-    bot.listen_to_channel(channel_id, |msg| handle(&bot, msg)).await;
+    bot.listen_to_channel(channel_id, |em| handle(&bot, em)).await;
 }
 
-async fn handle<B: Bot>(bot: &B, msg: Message) {
-    let client = bot.get_client();
-    let channel_id = msg.channel_id;
-    let content = msg.content;
+async fn handle<B: Bot>(bot: &B, em: EventModel) {
+    match em {
+        // Slack command received
+        EventModel::ApplicationCommand(ac) => {
+            let client = bot.get_client();
 
-    if msg.author.bot {
-        return;
+            _ = client
+                .create_interaction_response(
+                    ac.id.into(),
+                    &ac.token,
+                    &serde_json::json!({
+                        "type": InteractionResponseType::ChannelMessageWithSource as u8,
+                        "data": {
+                            "content": "Pong"
+                        }
+                    }),
+                )
+                .await;
+        }
+        // Normal message received
+        EventModel::Message(msg) => {
+            let client = bot.get_client();
+            let channel_id = msg.channel_id;
+            let content = msg.content;
+
+            if msg.author.bot {
+                return;
+            }
+
+            _ = client
+                .send_message(
+                    channel_id.into(),
+                    &serde_json::json!({
+                        "content": content,
+                    }),
+                )
+                .await;
+        }
     }
-
-    _ = client
-        .send_message(
-            channel_id.into(),
-            &serde_json::json!({
-                "content": content,
-            }),
-        )
-        .await;
 }
 ```
 

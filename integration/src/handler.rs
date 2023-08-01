@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use axum::async_trait;
-use serenity::model::channel::Message;
+use serde::Serialize;
+use serenity::model::{application::interaction::Interaction, channel::Message, id::ChannelId};
 use serenity::prelude::{Context, EventHandler};
 use sqlx::PgPool;
 
@@ -16,8 +17,26 @@ pub struct Handler {
 
 #[async_trait]
 impl EventHandler for Handler {
+    async fn interaction_create(&self, _ctx: Context, interaction: Interaction) {
+        match interaction {
+            Interaction::ApplicationCommand(c) => {
+                self.send_hook(c.channel_id, &c, "ApplicationCommand").await;
+            }
+            _ => {}
+        }
+    }
     async fn message(&self, _ctx: Context, msg: Message) {
-        let channel_id = msg.channel_id;
+        self.send_hook(msg.channel_id, &msg, "Message").await;
+    }
+}
+
+impl Handler {
+    async fn send_hook<T: Serialize + ?Sized>(
+        &self,
+        channel_id: ChannelId,
+        msg: &T,
+        event_model: &str,
+    ) {
         let flows: Option<Vec<Flow>> = if self.token == DEFAULT_BOT_PLACEHOLDER {
             let select = "
                 SELECT flows_user, flow_id
@@ -52,8 +71,9 @@ impl EventHandler for Handler {
         let client = get_client();
         _ = client
             .post(HOOK_URL.as_str())
-            .json(&msg)
+            .json(msg)
             .header("X-Discord-flows", flows)
+            .header("X-Discord-event-model", event_model)
             .send()
             .await;
     }
