@@ -7,7 +7,7 @@
     <img src="https://img.shields.io/crates/v/discord-flows.svg">
   </a>
 
-  Discord Integration for [Flows.network](https://test.flows.network)
+  Discord Integration for [Flows.network](https://flows.network)
 </div>
 
 ## Quick Start
@@ -29,7 +29,7 @@ pub async fn run() {
 
 async fn handle<B: Bot>(bot: &B, em: EventModel) {
     match em {
-        // Slack command received
+        // Slash command received
         EventModel::ApplicationCommand(ac) => {
             let client = bot.get_client();
 
@@ -149,7 +149,7 @@ pub async fn run() {
 
 async fn handle<B: Bot>(bot: &B, em: EventModel) {
     match em {
-        // Slack command received
+        // Slash command received
         EventModel::ApplicationCommand(ac) => {
             let client = bot.get_client();
 
