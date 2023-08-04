@@ -18,6 +18,7 @@ This is a plain text echo bot.
 use discord_flows::{
     model::application::interaction::InteractionResponseType, Bot, EventModel, ProvidedBot,
 };
+use std::time::Duration;
 
 #[no_mangle]
 #[tokio::main(flavor = "current_thread")]
@@ -158,13 +159,11 @@ async fn handle<B: Bot>(bot: &B, em: EventModel) {
                     ac.id.into(),
                     &ac.token,
                     &serde_json::json!({
-                        "type": InteractionResponseType::ChannelMessageWithSource as u8,
-                        "data": {
-                            "content": "Waiting..."
-                        }
+                        "type": InteractionResponseType::DeferredChannelMessageWithSource as u8,
                     }),
                 )
                 .await;
+            tokio::time::sleep(Duration::from_secs(3)).await;
             client.set_application_id(ac.application_id.into());
             _ = client
                 .edit_original_interaction_response(
