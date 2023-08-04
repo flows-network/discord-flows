@@ -39,13 +39,40 @@ async fn handle<B: Bot>(bot: &B, em: EventModel) {
                     ac.id.into(),
                     &ac.token,
                     &serde_json::json!({
-                        "type": InteractionResponseType::ChannelMessageWithSource as u8,
-                        "data": {
-                            "content": "Pong"
-                        }
+                        "type": InteractionResponseType::DeferredChannelMessageWithSource as u8,
                     }),
                 )
                 .await;
+            tokio::time::sleep(Duration::from_secs(3)).await;
+            client.set_application_id(ac.application_id.into());
+            _ = client
+                .edit_original_interaction_response(
+                    &ac.token,
+                    &serde_json::json!({
+                        "content": "Pong"
+                    }),
+                )
+                .await;
+
+            if let Ok(m) = client
+                .create_followup_message(
+                    &ac.token,
+                    &serde_json::json!({
+                        "content": "PongPong"
+                    }),
+                )
+                .await
+            {
+                _ = client
+                    .edit_followup_message(
+                        &ac.token,
+                        m.id.into(),
+                        &serde_json::json!({
+                            "content": "PongPongPong"
+                        }),
+                    )
+                    .await;
+            }
         }
         // Normal message received
         EventModel::Message(msg) => {
@@ -139,6 +166,7 @@ If you don't want to create your own Discord Bot, we have created a pub Bot whic
 use discord_flows::{
     model::application::interaction::InteractionResponseType, Bot, EventModel, DefaultBot,
 };
+use std::time::Duration;
 
 #[no_mangle]
 #[tokio::main(flavor = "current_thread")]
