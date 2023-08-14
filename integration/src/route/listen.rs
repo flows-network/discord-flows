@@ -1,14 +1,16 @@
 use axum::extract::{Path, Query, State};
 use reqwest::StatusCode;
+use sqlx::{PgPool, Postgres};
 
 use crate::{
-    model::{ListenPath, ListenerQuery},
+    model::{DiscordChannel, GuildAuthor, ListenPath, ListenerQuery},
+    shared::get_client,
     state::AppState,
     utils::{
         database::{del_listener_by_token, safe_shutdown},
         http::check_token,
     },
-    DEFAULT_BOT_PLACEHOLDER,
+    DEFAULT_BOT_PLACEHOLDER, DEFAULT_TOKEN,
 };
 
 const NONE_CHANNEL_ID: &'static str = "0";
@@ -26,17 +28,25 @@ pub async fn listen(
 
     if bot_token == DEFAULT_BOT_PLACEHOLDER {
         match channel_id != NONE_CHANNEL_ID {
-            true => {
-                listener::insert_listener(
-                    &flow_id,
-                    &flows_user,
-                    &channel_id,
-                    DEFAULT_BOT_PLACEHOLDER,
-                    pool,
-                )
-                .await?;
-                return Ok(StatusCode::OK);
-            }
+            true => match authorized_channel(&flows_user, &channel_id, pool).await? {
+                true => {
+                    listener::insert_listener(
+                        &flow_id,
+                        &flows_user,
+                        &channel_id,
+                        DEFAULT_BOT_PLACEHOLDER,
+                        pool,
+                    )
+                    .await?;
+                    return Ok(StatusCode::OK);
+                }
+                false => {
+                    return Err((
+                        StatusCode::BAD_REQUEST,
+                        String::from("Not authorized channel"),
+                    ));
+                }
+            },
             false => {
                 return Err((StatusCode::BAD_REQUEST, String::from("Bad request")));
             }
@@ -78,6 +88,63 @@ pub async fn listen(
     });
 
     Ok(StatusCode::OK)
+}
+
+async fn authorized_channel(
+    flows_user: &str,
+    channel_id: &str,
+    pool: &PgPool,
+) -> Result<bool, (StatusCode, String)> {
+    let channel = get_channel(&channel_id).await?;
+    let (sql, id) = match channel.guild_id {
+        Some(gid) => (
+            "SELECT * FROM guild_author
+            WHERE flows_user = $1 AND discord_guild_id = $2
+            ",
+            gid,
+        ),
+        None => match channel.owner_id {
+            Some(oid) => (
+                "SELECT * FROM guild_author
+                WHERE flows_user = $1 AND discord_user_id = $2
+                ",
+                oid,
+            ),
+            None => {
+                return Ok(false);
+            }
+        },
+    };
+
+    Ok(sqlx::query_as::<Postgres, GuildAuthor>(sql)
+        .bind(flows_user)
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or_default()
+        .is_some())
+}
+
+async fn get_channel(channel_id: &str) -> Result<DiscordChannel, (StatusCode, String)> {
+    let url = format!("https://discord.com/api/channels/{}", channel_id);
+
+    let client = get_client();
+    let resp = client
+        .get(url)
+        .header("Authorization", &format!("Bot {}", &*DEFAULT_TOKEN))
+        .send()
+        .await;
+
+    match resp {
+        Ok(r) => match r.status().is_success() {
+            true => r
+                .json::<DiscordChannel>()
+                .await
+                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string())),
+            false => Err((r.status(), r.text().await.unwrap_or_else(|e| e.to_string()))),
+        },
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
+    }
 }
 
 mod listener {

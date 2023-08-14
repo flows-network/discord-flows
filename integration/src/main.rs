@@ -1,4 +1,4 @@
-use crate::route::{connected, listen, proxy, static_path};
+use crate::route::{access, auth, connected, listen, proxy, static_path};
 
 use std::sync::Arc;
 
@@ -21,7 +21,7 @@ mod utils;
 lazy_static::lazy_static! {
     static ref HOOK_URL: String =
         std::env::var("PLATFORM_HOOK_URL").unwrap_or(String::from("https://code.flows.network/hook/discord/message"));
-    static ref DEFAULT_TOKEN: String = std::env::var("DEFAULT_TOKEN").unwrap();
+    static ref DEFAULT_TOKEN: String = std::env::var("DEFAULT_DISCORD_APP_BOT_TOKEN").unwrap();
 }
 static STATIC_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/static");
 
@@ -36,6 +36,8 @@ async fn main() {
         .route("/proxy/:api/*path", any(proxy))
         .route("/connected/:flows_user", get(connected))
         .route("/static/*path", get(static_path))
+        .route("/access/:state", get(access))
+        .route("/auth", get(auth))
         .with_state(state);
 
     axum::Server::bind(&"0.0.0.0:6870".parse().unwrap())
