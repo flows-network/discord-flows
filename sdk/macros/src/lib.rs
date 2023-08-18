@@ -31,7 +31,7 @@ pub fn message_handler(_: TokenStream, item: TokenStream) -> TokenStream {
 
         #[no_mangle]
         #[tokio::main(flavor = "current_thread")]
-        pub async fn on_message_received() {
+        pub async fn __on_message_received() {
             if let Some(m) = message_from_subscription() {
                 #func_ident(m).await;
             }
@@ -73,7 +73,7 @@ pub fn application_command_handler(_: TokenStream, item: TokenStream) -> TokenSt
 
         #[no_mangle]
         #[tokio::main(flavor = "current_thread")]
-        pub async fn on_application_command_received() {
+        pub async fn __on_application_command_received() {
             if let Some(m) = application_command_from_subscription() {
                 #func_ident(m).await;
             }
