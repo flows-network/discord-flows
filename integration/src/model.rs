@@ -4,9 +4,10 @@ use serde::{Deserialize, Serialize};
 pub struct Flow {
     pub flows_user: String,
     pub flow_id: String,
+    pub handler_fn: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Deserialize, sqlx::FromRow)]
 pub struct ListenPath {
     pub flows_user: String,
     pub flow_id: String,
@@ -34,6 +35,7 @@ pub struct DiscordChannel {
 
 #[derive(Deserialize)]
 pub struct ListenerQuery {
+    pub handler_fn: Option<String>,
     pub bot_token: String,
 }
 

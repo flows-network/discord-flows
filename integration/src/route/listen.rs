@@ -22,7 +22,10 @@ pub async fn listen(
         channel_id,
     }): Path<ListenPath>,
     State(state): State<AppState>,
-    Query(ListenerQuery { bot_token }): Query<ListenerQuery>,
+    Query(ListenerQuery {
+        handler_fn,
+        bot_token,
+    }): Query<ListenerQuery>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     let pool = &state.pool;
 
@@ -33,6 +36,7 @@ pub async fn listen(
                     listener::insert_listener(
                         &flow_id,
                         &flows_user,
+                        &handler_fn,
                         &channel_id,
                         DEFAULT_BOT_PLACEHOLDER,
                         pool,
@@ -62,14 +66,22 @@ pub async fn listen(
         return Err((StatusCode::FORBIDDEN, "Unauthorized token".to_string()));
     }
 
-    let old = listener::select_old(&flow_id, &flows_user, &channel_id, pool).await;
+    let old = listener::select_old(&flow_id, &flows_user, &handler_fn, &channel_id, pool).await;
     if old.is_some() {
         if old.as_ref().unwrap().token == bot_token {
             return Ok(StatusCode::OK);
         }
     }
 
-    listener::insert_listener(&flow_id, &flows_user, &channel_id, &bot_token, pool).await?;
+    listener::insert_listener(
+        &flow_id,
+        &flows_user,
+        &handler_fn,
+        &channel_id,
+        &bot_token,
+        pool,
+    )
+    .await?;
 
     if old.is_some() {
         safe_shutdown(&old.as_ref().unwrap().token, pool).await;
@@ -156,19 +168,21 @@ mod listener {
     pub async fn insert_listener(
         flow_id: &str,
         flows_user: &str,
+        handler_fn: &Option<String>,
         channel_id: &str,
         bot_token: &str,
         pool: &PgPool,
     ) -> Result<(), (StatusCode, String)> {
         let insert = "
-            INSERT INTO listener(flow_id, flows_user, channel_id, bot_token)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO listener(flow_id, flows_user, handler_fn, channel_id, bot_token)
+            VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (flow_id, flows_user)
-            DO UPDATE SET bot_token = excluded.bot_token, channel_id = excluded.channel_id
+            DO UPDATE SET bot_token = excluded.bot_token, channel_id = excluded.channel_id, handler_fn = excluded.handler_fn
         ";
         _ = sqlx::query(insert)
             .bind(flow_id)
             .bind(flows_user)
+            .bind(handler_fn)
             .bind(channel_id)
             .bind(bot_token)
             .execute(pool)
@@ -181,6 +195,7 @@ mod listener {
     pub async fn select_old(
         flow_id: &str,
         flows_user: &str,
+        handler_fn: &Option<String>,
         channel_id: &str,
         pool: &PgPool,
     ) -> Option<Bot> {
@@ -188,11 +203,12 @@ mod listener {
         let select = "
         SELECT bot_token
         FROM listener
-        WHERE flow_id = $1 AND flows_user = $2 AND channel_id = $3
+        WHERE flow_id = $1 AND flows_user = $2 AND handler_fn = $3 AND channel_id = $4
     ";
         sqlx::query_as(select)
             .bind(flow_id)
             .bind(flows_user)
+            .bind(handler_fn)
             .bind(channel_id)
             .fetch_optional(pool)
             .await

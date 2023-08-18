@@ -15,18 +15,34 @@ pub struct Handler {
     pub pool: Arc<PgPool>,
 }
 
+enum EventModel {
+    ApplicationCommand,
+    Message,
+}
+
+impl std::fmt::Display for EventModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            EventModel::ApplicationCommand => write!(f, "ApplicationCommand"),
+            EventModel::Message => write!(f, "Message"),
+        }
+    }
+}
+
 #[async_trait]
 impl EventHandler for Handler {
     async fn interaction_create(&self, _ctx: Context, interaction: Interaction) {
         match interaction {
             Interaction::ApplicationCommand(c) => {
-                self.send_hook(c.channel_id, &c, "ApplicationCommand").await;
+                self.send_hook(c.channel_id, &c, EventModel::ApplicationCommand)
+                    .await;
             }
             _ => {}
         }
     }
     async fn message(&self, _ctx: Context, msg: Message) {
-        self.send_hook(msg.channel_id, &msg, "Message").await;
+        self.send_hook(msg.channel_id, &msg, EventModel::Message)
+            .await;
     }
 }
 
@@ -35,11 +51,11 @@ impl Handler {
         &self,
         channel_id: ChannelId,
         msg: &T,
-        event_model: &str,
+        event_model: EventModel,
     ) {
         let flows: Option<Vec<Flow>> = if self.token == DEFAULT_BOT_PLACEHOLDER {
             let select = "
-                SELECT flows_user, flow_id
+                SELECT flows_user, flow_id, handler_fn
                 FROM listener
                 WHERE channel_id = $1 and bot_token = $2
             ";
@@ -51,7 +67,7 @@ impl Handler {
                 .ok()
         } else {
             let select = "
-                SELECT flows_user, flow_id
+                SELECT flows_user, flow_id, handler_fn
                 FROM listener
                 WHERE (channel_id = '' or channel_id = $1) and bot_token = $2
             ";
@@ -64,7 +80,26 @@ impl Handler {
         };
 
         let flows = match flows {
-            Some(vf) if vf.len() > 0 => serde_json::to_string(&vf).unwrap(),
+            Some(vf) if vf.len() > 0 => {
+                let filtered: Vec<Flow> = vf
+                    .into_iter()
+                    .filter(|v| match &v.handler_fn {
+                        Some(hf) => match hf.as_str() {
+                            "on_message_received" => match event_model {
+                                EventModel::ApplicationCommand => false,
+                                EventModel::Message => true,
+                            },
+                            "on_application_command_received" => match event_model {
+                                EventModel::ApplicationCommand => true,
+                                EventModel::Message => false,
+                            },
+                            _ => false,
+                        },
+                        None => true,
+                    })
+                    .collect::<Vec<Flow>>();
+                serde_json::to_string(&filtered).unwrap()
+            }
             _ => return,
         };
 
@@ -73,7 +108,7 @@ impl Handler {
             .post(HOOK_URL.as_str())
             .json(msg)
             .header("X-Discord-flows", flows)
-            .header("X-Discord-event-model", event_model)
+            .header("X-Discord-event-model", event_model.to_string())
             .send()
             .await;
     }
