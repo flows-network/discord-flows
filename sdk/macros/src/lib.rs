@@ -14,7 +14,7 @@ pub fn message_handler(_: TokenStream, item: TokenStream) -> TokenStream {
             }
         }
 
-        fn message_from_subscription() -> Option<Message> {
+        fn __message_from_subscription() -> Option<Message> {
             unsafe {
                 let l = m::get_event_body_length();
                 let mut event_body = Vec::<u8>::with_capacity(l as usize);
@@ -32,7 +32,7 @@ pub fn message_handler(_: TokenStream, item: TokenStream) -> TokenStream {
         #[no_mangle]
         #[tokio::main(flavor = "current_thread")]
         pub async fn __on_message_received() {
-            if let Some(m) = message_from_subscription() {
+            if let Some(m) = __message_from_subscription() {
                 #func_ident(m).await;
             }
         }
@@ -56,7 +56,7 @@ pub fn application_command_handler(_: TokenStream, item: TokenStream) -> TokenSt
             }
         }
 
-        fn application_command_from_subscription() -> Option<ApplicationCommandInteraction> {
+        fn __application_command_from_subscription() -> Option<ApplicationCommandInteraction> {
             unsafe {
                 let l = n::get_event_body_length();
                 let mut event_body = Vec::<u8>::with_capacity(l as usize);
@@ -74,7 +74,7 @@ pub fn application_command_handler(_: TokenStream, item: TokenStream) -> TokenSt
         #[no_mangle]
         #[tokio::main(flavor = "current_thread")]
         pub async fn __on_application_command_received() {
-            if let Some(m) = application_command_from_subscription() {
+            if let Some(m) = __application_command_from_subscription() {
                 #func_ident(m).await;
             }
         }
