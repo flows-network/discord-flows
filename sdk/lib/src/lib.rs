@@ -58,9 +58,7 @@ pub trait Bot {
     /// #[tokio::main]
     /// pub async run() {
     ///     let bot = DefaultBot;
-    ///     bot.listen_to_messages_from_channel(123456, |msg| async {
-    ///         todo!()
-    ///     }).await;
+    ///     bot.listen_to_messages_from_channel(123456).await;
     /// }
     /// ```
     async fn listen_to_messages_from_channel(&self, channel_id: u64) {
@@ -75,9 +73,7 @@ pub trait Bot {
     /// #[tokio::main]
     /// pub async run() {
     ///     let bot = DefaultBot;
-    ///     bot.listen_to_application_commands_from_channel(123456, |msg| async {
-    ///         todo!()
-    ///     }).await;
+    ///     bot.listen_to_application_commands_from_channel(123456).await;
     /// }
     /// ```
     async fn listen_to_application_commands_from_channel(&self, channel_id: u64) {
@@ -125,9 +121,7 @@ impl ProvidedBot {
 /// #[tokio::main]
 /// pub async run() {
 ///     let bot = ProvidedBot::new("YOUR BOT TOKEN");
-///     bot.listen_to_messages(|msg| async {
-///         todo!()
-///     }).await;
+///     bot.listen_to_messages().await;
 /// }
 /// ```
 impl ProvidedBot {

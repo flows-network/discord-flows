@@ -17,91 +17,46 @@ as your bot. For how to create your own Bot please refer to our [blog](https://f
 
 ```rust
 use discord_flows::{
-    model::application::interaction::InteractionResponseType, Bot, EventModel, ProvidedBot,
+    model::Message,
+    Bot, ProvidedBot,
+    message_handler,
 };
-use std::time::Duration;
 
 #[no_mangle]
 #[tokio::main(flavor = "current_thread")]
-pub async fn run() {
+pub async fn on_deploy() {
     let token = std::env::var("DISCORD_TOKEN").unwrap();
     let bot = ProvidedBot::new(token);
-    bot.listen(|em| handle(&bot, em)).await;
+    bot.listen_to_messages().await;
 }
 
-async fn handle<B: Bot>(bot: &B, em: EventModel) {
-    match em {
-        // Slash command received
-        EventModel::ApplicationCommand(ac) => {
-            let client = bot.get_client();
+#[message_handler]
+async fn handle(msg: Message) {
+    let token = std::env::var("DISCORD_TOKEN").unwrap();
+    let bot = ProvidedBot::new(token);
+    let client = bot.get_client();
+    let channel_id = msg.channel_id;
+    let content = msg.content;
 
-            _ = client
-                .create_interaction_response(
-                    ac.id.into(),
-                    &ac.token,
-                    &serde_json::json!({
-                        "type": InteractionResponseType::DeferredChannelMessageWithSource as u8,
-                    }),
-                )
-                .await;
-            tokio::time::sleep(Duration::from_secs(3)).await;
-            client.set_application_id(ac.application_id.into());
-            _ = client
-                .edit_original_interaction_response(
-                    &ac.token,
-                    &serde_json::json!({
-                        "content": "Pong"
-                    }),
-                )
-                .await;
-
-            if let Ok(m) = client
-                .create_followup_message(
-                    &ac.token,
-                    &serde_json::json!({
-                        "content": "PongPong"
-                    }),
-                )
-                .await
-            {
-                _ = client
-                    .edit_followup_message(
-                        &ac.token,
-                        m.id.into(),
-                        &serde_json::json!({
-                            "content": "PongPongPong"
-                        }),
-                    )
-                    .await;
-            }
-        }
-        // Normal message received
-        EventModel::Message(msg) => {
-            let client = bot.get_client();
-            let channel_id = msg.channel_id;
-            let content = msg.content;
-
-            if msg.author.bot {
-                return;
-            }
-
-            _ = client
-                .send_message(
-                    channel_id.into(),
-                    &serde_json::json!({
-                        "content": content,
-                    }),
-                )
-                .await;
-        }
+    if msg.author.bot {
+        return;
     }
+
+    _ = client
+        .send_message(
+            channel_id.into(),
+            &serde_json::json!({
+                "content": content,
+            }),
+        )
+        .await;
 }
 ```
 
 [get_client()] is a `Discord` constructor that represents a bot.
 
-[listen_to_event()] is responsible for registering a listener for the bot
-represented by the `token`. When a new `Message` coming, the callback
+[listen_to_messages()] is responsible for registering a listener for the bot
+represented by the `token`. When a new `Message` coming, the fn `handle`
 is called with received `Message`.
 
 
@@ -110,7 +65,12 @@ If you don't want to create your own Discord Bot, we have created a public Bot w
 
 ```rust
 use discord_flows::{
-    model::application::interaction::InteractionResponseType, Bot, EventModel, DefaultBot,
+    model::{
+        application::interaction::InteractionResponseType,
+        prelude::application::interaction::application_command::ApplicationCommandInteraction,
+    },
+    Bot, DefaultBot,
+    application_command_handler,
 };
 use std::time::Duration;
 
@@ -119,74 +79,52 @@ use std::time::Duration;
 pub async fn run() {
     let channel_id = 1104392662985220296; // Your channel id
     let bot = DefaultBot {};
-    bot.listen_to_channel(channel_id, |em| handle(&bot, em)).await;
+    bot.listen_to_application_commands_from_channel(channel_id).await;
 }
 
-async fn handle<B: Bot>(bot: &B, em: EventModel) {
-    match em {
-        // Slash command received
-        EventModel::ApplicationCommand(ac) => {
-            let client = bot.get_client();
+#[application_command_handler]
+async fn handle(ac: ApplicationCommandInteraction) {
+    let bot = DefaultBot {};
+    let client = bot.get_client();
 
-            _ = client
-                .create_interaction_response(
-                    ac.id.into(),
-                    &ac.token,
-                    &serde_json::json!({
-                        "type": InteractionResponseType::DeferredChannelMessageWithSource as u8,
-                    }),
-                )
-                .await;
-            tokio::time::sleep(Duration::from_secs(3)).await;
-            client.set_application_id(ac.application_id.into());
-            _ = client
-                .edit_original_interaction_response(
-                    &ac.token,
-                    &serde_json::json!({
-                        "content": "Pong"
-                    }),
-                )
-                .await;
+    _ = client
+        .create_interaction_response(
+            ac.id.into(),
+            &ac.token,
+            &serde_json::json!({
+                "type": InteractionResponseType::DeferredChannelMessageWithSource as u8,
+            }),
+        )
+        .await;
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    client.set_application_id(ac.application_id.into());
+    _ = client
+        .edit_original_interaction_response(
+            &ac.token,
+            &serde_json::json!({
+                "content": "Pong"
+            }),
+        )
+        .await;
 
-            if let Ok(m) = client
-                .create_followup_message(
-                    &ac.token,
-                    &serde_json::json!({
-                        "content": "PongPong"
-                    }),
-                )
-                .await
-            {
-                _ = client
-                    .edit_followup_message(
-                        &ac.token,
-                        m.id.into(),
-                        &serde_json::json!({
-                            "content": "PongPongPong"
-                        }),
-                    )
-                    .await;
-            }
-        }
-        // Normal message received
-        EventModel::Message(msg) => {
-            let client = bot.get_client();
-            let channel_id = msg.channel_id;
-            let content = msg.content;
-
-            if msg.author.bot {
-                return;
-            }
-
-            _ = client
-                .send_message(
-                    channel_id.into(),
-                    &serde_json::json!({
-                        "content": content,
-                    }),
-                )
-                .await;
-        }
+    if let Ok(m) = client
+        .create_followup_message(
+            &ac.token,
+            &serde_json::json!({
+                "content": "PongPong"
+            }),
+        )
+        .await
+    {
+        _ = client
+            .edit_followup_message(
+                &ac.token,
+                m.id.into(),
+                &serde_json::json!({
+                    "content": "PongPongPong"
+                }),
+            )
+            .await;
     }
 }
 ```
