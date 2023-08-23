@@ -1,6 +1,6 @@
 [package]
 name = "discord-flows"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 license = "MIT/Apache-2.0"
 description = "Discord Integration for flows.network"
@@ -24,5 +24,5 @@ tokio_wasi = { version = "1.25.1", features = ["macros", "rt", "sync", "time"] }
 tracing = "0.1.37"
 url = "2"
 
-discord-flows-macros = "0.1"
+discord-flows-macros = { version = "0.1", path = "../macros" }
 

@@ -85,11 +85,11 @@ impl Handler {
                     .into_iter()
                     .filter(|v| match &v.handler_fn {
                         Some(hf) => match hf.as_str() {
-                            "__on_message_received" => match event_model {
+                            "__discord__on_message_received" => match event_model {
                                 EventModel::ApplicationCommand => false,
                                 EventModel::Message => true,
                             },
-                            "__on_application_command_received" => match event_model {
+                            "__discord__on_application_command_received" => match event_model {
                                 EventModel::ApplicationCommand => true,
                                 EventModel::Message => false,
                             },

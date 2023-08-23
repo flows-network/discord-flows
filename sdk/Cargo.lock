@@ -81,11 +81,11 @@ dependencies = [
 
 [[package]]
 name = "discord-flows"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "async-trait",
  "const_format",
- "discord-flows-macros 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "discord-flows-macros",
  "flowsnet-platform-sdk",
  "http_req_wasi",
  "lazy_static",
@@ -100,20 +100,7 @@ dependencies = [
 
 [[package]]
 name = "discord-flows-macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "serde_json",
- "serenity",
- "syn 2.0.29",
-]
-
-[[package]]
-name = "discord-flows-macros"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ebbc05584097988b7a9a204dea9505f3d7aabf7ce0706cfed3067439e67cf02"
+version = "0.1.1"
 dependencies = [
  "proc-macro2",
  "quote",

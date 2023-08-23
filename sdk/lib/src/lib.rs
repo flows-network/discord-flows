@@ -135,11 +135,16 @@ impl ProvidedBot {
 }
 
 async fn listen_to_messages(token: &str, channel_id: Option<u64>) {
-    listen_to(token, "__on_message_received", channel_id).await;
+    listen_to(token, "__discord__on_message_received", channel_id).await;
 }
 
 async fn listen_to_application_commands(token: &str, channel_id: Option<u64>) {
-    listen_to(token, "__on_application_command_received", channel_id).await;
+    listen_to(
+        token,
+        "__discord__on_application_command_received",
+        channel_id,
+    )
+    .await;
 }
 
 async fn listen_to(token: &str, handler_fn: &str, channel_id: Option<u64>) {

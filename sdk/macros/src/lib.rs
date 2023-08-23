@@ -7,7 +7,7 @@ pub fn message_handler(_: TokenStream, item: TokenStream) -> TokenStream {
     let func_ident = ast.sig.ident.clone();
 
     let gen = quote! {
-        mod m {
+        mod discord_flows_macros_m {
             extern "C" {
                 pub fn get_event_body_length() -> i32;
                 pub fn get_event_body(p: *mut u8) -> i32;
@@ -16,9 +16,9 @@ pub fn message_handler(_: TokenStream, item: TokenStream) -> TokenStream {
 
         fn __message_from_subscription() -> Option<Message> {
             unsafe {
-                let l = m::get_event_body_length();
+                let l = discord_flows_macros_m::get_event_body_length();
                 let mut event_body = Vec::<u8>::with_capacity(l as usize);
-                let c = m::get_event_body(event_body.as_mut_ptr());
+                let c = discord_flows_macros_m::get_event_body(event_body.as_mut_ptr());
                 assert!(c == l);
                 event_body.set_len(c as usize);
 
@@ -31,7 +31,7 @@ pub fn message_handler(_: TokenStream, item: TokenStream) -> TokenStream {
 
         #[no_mangle]
         #[tokio::main(flavor = "current_thread")]
-        pub async fn __on_message_received() {
+        pub async fn __discord__on_message_received() {
             if let Some(m) = __message_from_subscription() {
                 #func_ident(m).await;
             }
@@ -49,7 +49,7 @@ pub fn application_command_handler(_: TokenStream, item: TokenStream) -> TokenSt
     let func_ident = ast.sig.ident.clone();
 
     let gen = quote! {
-        mod n {
+        mod discord_flows_macros_n {
             extern "C" {
                 pub fn get_event_body_length() -> i32;
                 pub fn get_event_body(p: *mut u8) -> i32;
@@ -58,9 +58,9 @@ pub fn application_command_handler(_: TokenStream, item: TokenStream) -> TokenSt
 
         fn __application_command_from_subscription() -> Option<ApplicationCommandInteraction> {
             unsafe {
-                let l = n::get_event_body_length();
+                let l = discord_flows_macros_n::get_event_body_length();
                 let mut event_body = Vec::<u8>::with_capacity(l as usize);
-                let c = n::get_event_body(event_body.as_mut_ptr());
+                let c = discord_flows_macros_n::get_event_body(event_body.as_mut_ptr());
                 assert!(c == l);
                 event_body.set_len(c as usize);
 
@@ -73,7 +73,7 @@ pub fn application_command_handler(_: TokenStream, item: TokenStream) -> TokenSt
 
         #[no_mangle]
         #[tokio::main(flavor = "current_thread")]
-        pub async fn __on_application_command_received() {
+        pub async fn __discord__on_application_command_received() {
             if let Some(m) = __application_command_from_subscription() {
                 #func_ident(m).await;
             }
