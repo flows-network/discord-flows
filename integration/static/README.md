@@ -76,7 +76,7 @@ use std::time::Duration;
 
 #[no_mangle]
 #[tokio::main(flavor = "current_thread")]
-pub async fn run() {
+pub async fn on_deploy() {
     let channel_id = 1104392662985220296; // Your channel id
     let bot = DefaultBot {};
     bot.listen_to_application_commands_from_channel(channel_id).await;
