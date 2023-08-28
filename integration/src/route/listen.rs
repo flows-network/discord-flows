@@ -92,7 +92,7 @@ pub async fn listen(
         _ = state
             .start_client(bot_token.clone(), |start| async move {
                 if !start {
-                    _ = del_listener_by_token(&flow_id, &flows_user, "", &bot_token, &cloned).await;
+                    _ = del_listener_by_token(&bot_token, &cloned).await;
                     safe_shutdown(&bot_token, &cloned).await;
                 }
             })
@@ -176,8 +176,7 @@ mod listener {
         let insert = "
             INSERT INTO listener(flow_id, flows_user, handler_fn, channel_id, bot_token)
             VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (flow_id, flows_user)
-            DO UPDATE SET bot_token = excluded.bot_token, channel_id = excluded.channel_id, handler_fn = excluded.handler_fn
+            ON CONFLICT DO NOTHING
         ";
         _ = sqlx::query(insert)
             .bind(flow_id)

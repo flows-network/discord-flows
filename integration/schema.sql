@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS listener (
     handler_fn text,
     channel_id text,
     bot_token text NOT NULL,
-    PRIMARY KEY (flow_id, flows_user)
+    UNIQUE (flow_id, flows_user, handler_fn, channel_id, bot_token)
 );
 
 CREATE TABLE IF NOT EXISTS guild_author (
