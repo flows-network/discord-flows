@@ -64,9 +64,30 @@ pub fn application_command_handler(_: TokenStream, item: TokenStream) -> TokenSt
                 assert!(c == l);
                 event_body.set_len(c as usize);
 
-                match serde_json::from_slice::<ApplicationCommandInteraction>(&event_body) {
-                    Ok(e) => Some(e),
-                    Err(_) => None,
+                match serde_json::from_slice::<Value>(&event_body) {
+                    Ok(mut v) if v.is_object() => {
+                        let mut v = v.as_object_mut().unwrap();
+                        if let Some(ap) = v.get("app_permissions") {
+                            if ap.is_null() {
+                                v.remove("app_permissions");
+                            }
+                        }
+
+                        if let Some(gl) = v.get("guild_locale") {
+                            if gl.is_null() {
+                                v.remove("guild_locale");
+                            }
+                        }
+                        let v = serde_json::to_vec(v).unwrap();
+                        match serde_json::from_slice::<ApplicationCommandInteraction>(&v) {
+                            Ok(e) => Some(e),
+                            Err(e) => {
+                                println!("{:?}", e);
+                                None
+                            }
+                        }
+                    }
+                    _ => None,
                 }
             }
         }

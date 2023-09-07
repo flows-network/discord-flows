@@ -26,11 +26,16 @@ pub struct Count {
 }
 
 #[derive(Deserialize)]
+pub struct Recipient {
+    pub id: String,
+}
+
+#[derive(Deserialize)]
 pub struct DiscordChannel {
     #[serde(rename = "type")]
     pub ctype: u8,
     pub guild_id: Option<String>,
-    pub owner_id: Option<String>,
+    pub recipients: Option<Vec<Recipient>>,
 }
 
 #[derive(Deserialize)]

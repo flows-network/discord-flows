@@ -7,5 +7,6 @@ default.nix
 **/target
 integration/Cargo.lock
 wasi/Cargo.lock
+sdk/Cargo.lock
 integration/.cargo
 build.rs

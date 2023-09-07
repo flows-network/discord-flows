@@ -69,7 +69,9 @@ impl AppState {
             .unwrap();
 
         for Bot { token } in bots {
-            _ = self.start_client(token, |_| async {}).await;
+            if token.ne(DEFAULT_BOT_PLACEHOLDER) {
+                _ = self.start_client(token, |_| async {}).await;
+            }
         }
     }
 }

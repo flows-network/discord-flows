@@ -108,6 +108,7 @@ async fn authorized_channel(
     pool: &PgPool,
 ) -> Result<bool, (StatusCode, String)> {
     let channel = get_channel(&channel_id).await?;
+
     let (sql, id) = match channel.guild_id {
         Some(gid) => (
             "SELECT * FROM guild_author
@@ -115,14 +116,20 @@ async fn authorized_channel(
             ",
             gid,
         ),
-        None => match channel.owner_id {
-            Some(oid) => (
-                "SELECT * FROM guild_author
-                WHERE flows_user = $1 AND discord_user_id = $2
-                ",
-                oid,
-            ),
-            None => {
+        None => match channel.ctype {
+            // DM's type is 1
+            1 => match channel.recipients {
+                Some(recipients) if recipients.len() == 1 => (
+                    "SELECT * FROM guild_author
+                            WHERE flows_user = $1 AND discord_user_id = $2
+                            ",
+                    recipients[0].id.clone(),
+                ),
+                _ => {
+                    return Ok(false);
+                }
+            },
+            _ => {
                 return Ok(false);
             }
         },
