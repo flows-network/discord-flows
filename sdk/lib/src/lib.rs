@@ -189,14 +189,14 @@ async fn listen_to(token: &str, trigger_type: TriggerType, channel_id: Option<u6
                 let output = match channel_id {
                     Some(c) => format!(
                         "[{}] Listening {} from channel `{}`.",
-                        trigger_type,
                         std::env!("CARGO_CRATE_NAME"),
+                        trigger_type,
                         c
                     ),
                     None => format!(
                         "[{}] Listening {} from all channels your bot is on.",
+                        std::env!("CARGO_CRATE_NAME"),
                         trigger_type,
-                        std::env!("CARGO_CRATE_NAME")
                     ),
                 };
                 set_output(output.as_ptr(), output.len() as i32);
