@@ -10,6 +10,7 @@ use async_trait::async_trait;
 use flowsnet_platform_sdk::write_error_log;
 use http::{Http, HttpBuilder};
 use http_req::request;
+use std::fmt;
 
 const API_PREFIX: &str = match std::option_env!("DISCORD_API_PREFIX") {
     Some(v) => v,
@@ -46,6 +47,24 @@ pub(crate) unsafe fn _get_flow_id() -> String {
     String::from_utf8(flow_id).unwrap()
 }
 
+enum TriggerType {
+    Message,
+    ApplicationCommand,
+}
+
+impl fmt::Display for TriggerType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Message => "messages",
+                Self::ApplicationCommand => "application commands",
+            }
+        )
+    }
+}
+
 #[async_trait]
 pub trait Bot {
     fn get_token(&self) -> String;
@@ -62,7 +81,7 @@ pub trait Bot {
     /// }
     /// ```
     async fn listen_to_messages_from_channel(&self, channel_id: u64) {
-        listen_to_messages(&self.get_token(), Some(channel_id)).await;
+        listen_to(&self.get_token(), TriggerType::Message, Some(channel_id)).await;
     }
 
     /// Create a application command listener for Discord bot provided by flows.network
@@ -77,7 +96,12 @@ pub trait Bot {
     /// }
     /// ```
     async fn listen_to_application_commands_from_channel(&self, channel_id: u64) {
-        listen_to_application_commands(&self.get_token(), Some(channel_id)).await;
+        listen_to(
+            &self.get_token(),
+            TriggerType::ApplicationCommand,
+            Some(channel_id),
+        )
+        .await;
     }
 
     /// Get a Discord Client as a bot represented by `bot_token`
@@ -126,28 +150,20 @@ impl ProvidedBot {
 /// ```
 impl ProvidedBot {
     pub async fn listen_to_messages(&self) {
-        listen_to_messages(&self.token, None).await;
+        listen_to(&self.token, TriggerType::Message, None).await;
     }
 
     pub async fn listen_to_application_commands(&self) {
-        listen_to_application_commands(&self.token, None).await;
+        listen_to(&self.token, TriggerType::ApplicationCommand, None).await;
     }
 }
 
-async fn listen_to_messages(token: &str, channel_id: Option<u64>) {
-    listen_to(token, "__discord__on_message_received", channel_id).await;
-}
+async fn listen_to(token: &str, trigger_type: TriggerType, channel_id: Option<u64>) {
+    let handler_fn = match trigger_type {
+        TriggerType::Message => "__discord__on_message_received",
+        TriggerType::ApplicationCommand => "__discord__on_application_command_received",
+    };
 
-async fn listen_to_application_commands(token: &str, channel_id: Option<u64>) {
-    listen_to(
-        token,
-        "__discord__on_application_command_received",
-        channel_id,
-    )
-    .await;
-}
-
-async fn listen_to(token: &str, handler_fn: &str, channel_id: Option<u64>) {
     unsafe {
         let flows_user = _get_flows_user();
         let flow_id = _get_flow_id();
@@ -172,12 +188,14 @@ async fn listen_to(token: &str, handler_fn: &str, channel_id: Option<u64>) {
             true => {
                 let output = match channel_id {
                     Some(c) => format!(
-                        "[{}] Listening to channel `{}`.",
+                        "[{}] Listening {} from channel `{}`.",
+                        trigger_type,
                         std::env!("CARGO_CRATE_NAME"),
                         c
                     ),
                     None => format!(
-                        "[{}] Listening to all channels your bot is on.",
+                        "[{}] Listening {} from all channels your bot is on.",
+                        trigger_type,
                         std::env!("CARGO_CRATE_NAME")
                     ),
                 };
